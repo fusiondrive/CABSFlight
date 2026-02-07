@@ -32,6 +32,8 @@
 		AA1A11182F37B4AA00016C68 = {
 			isa = PBXGroup;
 			children = (
+				AA1A11302F37B4F800016C68 /* ViewModels */,
+				AA1A112F2F37B4E900016C68 /* Models */,
 				AA1A11232F37B4AA00016C68 /* CABSFlight */,
 				AA1A11222F37B4AA00016C68 /* Products */,
 			);
@@ -43,6 +45,20 @@
 				AA1A11212F37B4AA00016C68 /* CABSFlight.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		AA1A112F2F37B4E900016C68 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AA1A11302F37B4F800016C68 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ViewModels;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
