@@ -79,7 +79,7 @@ struct ContentView: View {
             if !viewModel.animatedBuses.isEmpty {
                 FloatingInfoCard(viewModel: viewModel)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 140) // Above route picker
+                    .padding(.bottom, 8)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -123,7 +123,7 @@ struct FloatingInfoCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             // Top row: Route label + Live badge
             HStack {
                 Text("CAMPUS CONNECTOR")
@@ -152,7 +152,7 @@ struct FloatingInfoCard: View {
             
             // Main content
             if let bus = displayBus {
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 2) {
                     // Destination
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.right.circle.fill")
@@ -192,7 +192,8 @@ struct FloatingInfoCard: View {
                     .foregroundColor(.white.opacity(0.7))
             }
         }
-        .padding(16)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 20)
                 .fill(.ultraThinMaterial)
