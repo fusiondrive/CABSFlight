@@ -11,6 +11,7 @@ import MapKit
 /// Main app view with Flighty-inspired dark map and bus tracking
 struct ContentView: View {
     @State private var viewModel = BusViewModel()
+    @State private var selectedStopID: String?
     
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
@@ -30,15 +31,28 @@ struct ContentView: View {
                 ForEach(routePolylines) { polyline in
                     MapPolyline(coordinates: polyline.coordinates)
                         .stroke(
-                            viewModel.selectedRoute?.color ?? .red,
+                            viewModel.selectedRoute?.officialColor ?? .red,
                             style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
                         )
                 }
                 
-                // Layer 2: Stop annotations (subway station dots)
+                // Layer 2: Stop annotations (subway station dots with bubbles)
                 ForEach(routeStops) { stop in
-                    Annotation("", coordinate: stop.coordinate) {
-                        StationDotView(routeColor: viewModel.selectedRoute?.color ?? .red)
+                    Annotation("", coordinate: stop.coordinate, anchor: .bottom) {
+                        StationAnnotationView(
+                            stop: stop,
+                            routeColor: viewModel.selectedRoute?.officialColor ?? .red,
+                            isSelected: selectedStopID == stop.id,
+                            onTap: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    if selectedStopID == stop.id {
+                                        selectedStopID = nil
+                                    } else {
+                                        selectedStopID = stop.id
+                                    }
+                                }
+                            }
+                        )
                     }
                 }
                 
@@ -61,6 +75,16 @@ struct ContentView: View {
             .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
             .mapControlVisibility(.hidden)
             .ignoresSafeArea()
+            .onChange(of: viewModel.selectedRoute?.id) { oldValue, newValue in
+                // Auto-zoom when route changes
+                if let route = viewModel.selectedRoute {
+                    selectedStopID = nil // Clear stop selection
+                    let region = calculateBoundingRegion(for: route)
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        cameraPosition = .region(region)
+                    }
+                }
+            }
             
             // MARK: - Overlay UI
             VStack(spacing: 0) {
@@ -108,6 +132,56 @@ struct ContentView: View {
     private var routeStops: [Stop] {
         viewModel.selectedRoute?.stops ?? []
     }
+    
+    // MARK: - Helper Methods
+    
+    /// Calculate bounding region to fit all route polylines
+    private func calculateBoundingRegion(for route: Route) -> MKCoordinateRegion {
+        var allCoordinates: [CLLocationCoordinate2D] = []
+        
+        // Collect from all patterns
+        for pattern in route.patterns {
+            let coords = PolylineDecoder.decode(pattern.encodedPolyline)
+            allCoordinates.append(contentsOf: coords)
+        }
+        
+        // Include stops
+        for stop in route.stops {
+            allCoordinates.append(stop.coordinate)
+        }
+        
+        // Fallback if empty
+        guard !allCoordinates.isEmpty else {
+            return MKCoordinateRegion(
+                center: BusViewModel.osuCenter,
+                span: MKCoordinateSpan(latitudeDelta: BusViewModel.defaultSpan, longitudeDelta: BusViewModel.defaultSpan)
+            )
+        }
+        
+        // Find bounds
+        var minLat = allCoordinates[0].latitude
+        var maxLat = allCoordinates[0].latitude
+        var minLng = allCoordinates[0].longitude
+        var maxLng = allCoordinates[0].longitude
+        
+        for coord in allCoordinates {
+            minLat = min(minLat, coord.latitude)
+            maxLat = max(maxLat, coord.latitude)
+            minLng = min(minLng, coord.longitude)
+            maxLng = max(maxLng, coord.longitude)
+        }
+        
+        // Calculate center and span with padding
+        let centerLat = (minLat + maxLat) / 2
+        let centerLng = (minLng + maxLng) / 2
+        let latDelta = max((maxLat - minLat) * 1.4, 0.005)
+        let lngDelta = max((maxLng - minLng) * 1.4, 0.005)
+        
+        return MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
+            span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lngDelta)
+        )
+    }
 }
 
 // MARK: - Identifiable Polyline Wrapper
@@ -117,20 +191,47 @@ struct IdentifiablePolyline: Identifiable {
     let coordinates: [CLLocationCoordinate2D]
 }
 
-// MARK: - Station Dot View (MBTA Subway Style)
+// MARK: - Station Annotation View (with Name Bubble)
 
-struct StationDotView: View {
+struct StationAnnotationView: View {
+    let stop: Stop
     let routeColor: Color
+    let isSelected: Bool
+    let onTap: () -> Void
     
     var body: some View {
-        Circle()
-            .fill(Color.white)
-            .frame(width: 12, height: 12)
-            .overlay(
-                Circle()
-                    .stroke(routeColor, lineWidth: 2.5)
-            )
-            .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+        VStack(spacing: 4) {
+            // Name bubble (shown when selected)
+            if isSelected {
+                Text(stop.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(Color.white)
+                            .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 2)
+                    )
+                    .transition(.scale.combined(with: .opacity))
+                    .zIndex(100)
+            }
+            
+            // Station dot
+            Circle()
+                .fill(Color.white)
+                .frame(width: isSelected ? 16 : 12, height: isSelected ? 16 : 12)
+                .overlay(
+                    Circle()
+                        .stroke(routeColor, lineWidth: isSelected ? 3 : 2.5)
+                )
+                .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                .scaleEffect(isSelected ? 1.1 : 1.0)
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .onTapGesture {
+            onTap()
+        }
     }
 }
 
@@ -178,7 +279,7 @@ struct FloatingInfoCard: View {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.system(size: 18))
-                            .foregroundColor(viewModel.selectedRoute?.color ?? .white)
+                            .foregroundColor(viewModel.selectedRoute?.officialColor ?? .white)
                         
                         Text(bus.destination ?? "En Route")
                             .font(.system(size: 22, weight: .bold))
@@ -431,7 +532,7 @@ struct RouteChip: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Circle()
-                    .fill(route.color)
+                    .fill(route.officialColor)
                     .frame(width: 10, height: 10)
                 
                 Text(route.id)
@@ -442,11 +543,11 @@ struct RouteChip: View {
             .padding(.vertical, 10)
             .background(
                 Capsule()
-                    .fill(isSelected ? route.color.opacity(0.25) : Color.white.opacity(0.08))
+                    .fill(isSelected ? route.officialColor.opacity(0.25) : Color.white.opacity(0.08))
                     .overlay(
                         Capsule()
                             .stroke(
-                                isSelected ? route.color : Color.white.opacity(0.12),
+                                isSelected ? route.officialColor : Color.white.opacity(0.12),
                                 lineWidth: isSelected ? 1.5 : 1
                             )
                     )
