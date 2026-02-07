@@ -17,6 +17,7 @@ final class BusViewModel {
     
     var routes: [Route] = []
     var selectedRoute: Route?
+    var selectedBus: Bus?
     var buses: [Bus] = []
     var animatedBuses: [Bus] = []
     var isLoading = false
@@ -55,12 +56,23 @@ final class BusViewModel {
     /// Select a route and fetch its buses and route details
     func selectRoute(_ route: Route) {
         selectedRoute = route
+        selectedBus = nil
         buses = []
         animatedBuses = []
         Task {
             await fetchRouteDetails(code: route.id)
             await fetchBuses()
         }
+    }
+    
+    /// Select a specific bus to show in the info card
+    func selectBus(_ bus: Bus) {
+        selectedBus = bus
+    }
+    
+    /// Clear bus selection
+    func clearBusSelection() {
+        selectedBus = nil
     }
     
     /// Load mock data for testing (useful when API returns empty at night)

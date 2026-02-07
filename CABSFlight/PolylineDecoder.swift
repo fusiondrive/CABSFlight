@@ -9,9 +9,12 @@ import Foundation
 import CoreLocation
 
 /// Decodes Google's encoded polyline format to coordinates
+/// Reference: https://developers.google.com/maps/documentation/utilities/polylinealgorithm
 enum PolylineDecoder {
     
     /// Decode an encoded polyline string to an array of coordinates
+    /// - Parameter encodedPolyline: Google encoded polyline string
+    /// - Returns: Array of CLLocationCoordinate2D
     static func decode(_ encodedPolyline: String) -> [CLLocationCoordinate2D] {
         var coordinates: [CLLocationCoordinate2D] = []
         var index = encodedPolyline.startIndex
@@ -25,7 +28,9 @@ enum PolylineDecoder {
             var byte: Int
             
             repeat {
-                byte = Int(encodedPolyline[index].asciiValue!) - 63
+                guard index < encodedPolyline.endIndex,
+                      let asciiValue = encodedPolyline[index].asciiValue else { break }
+                byte = Int(asciiValue) - 63
                 result |= (byte & 0x1F) << shift
                 shift += 5
                 index = encodedPolyline.index(after: index)
@@ -41,7 +46,9 @@ enum PolylineDecoder {
             result = 0
             
             repeat {
-                byte = Int(encodedPolyline[index].asciiValue!) - 63
+                guard index < encodedPolyline.endIndex,
+                      let asciiValue = encodedPolyline[index].asciiValue else { break }
+                byte = Int(asciiValue) - 63
                 result |= (byte & 0x1F) << shift
                 shift += 5
                 index = encodedPolyline.index(after: index)

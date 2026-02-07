@@ -27,8 +27,8 @@ struct ContentView: View {
             // MARK: - Map
             Map(position: $cameraPosition) {
                 // Route polylines
-                ForEach(routePolylines, id: \.self) { coordinates in
-                    MapPolyline(coordinates: coordinates)
+                ForEach(routePolylines) { polyline in
+                    MapPolyline(coordinates: polyline.coordinates)
                         .stroke(
                             LinearGradient(
                                 colors: [
@@ -46,7 +46,16 @@ struct ContentView: View {
                 // Bus annotations
                 ForEach(viewModel.animatedBuses) { bus in
                     Annotation("", coordinate: bus.coordinate) {
-                        BusMarkerView(bus: bus)
+                        BusMarkerView(bus: bus, isSelected: viewModel.selectedBus?.id == bus.id)
+                            .onTapGesture {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    if viewModel.selectedBus?.id == bus.id {
+                                        viewModel.clearBusSelection()
+                                    } else {
+                                        viewModel.selectBus(bus)
+                                    }
+                                }
+                            }
                     }
                 }
             }
@@ -65,6 +74,15 @@ struct ContentView: View {
                 BottomOverlay(viewModel: viewModel)
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            // Floating info card
+            if !viewModel.animatedBuses.isEmpty {
+                FloatingInfoCard(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 140) // Above route picker
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
         .preferredColorScheme(.dark)
         .onAppear {
             viewModel.startTracking()
@@ -76,11 +94,125 @@ struct ContentView: View {
     
     // MARK: - Computed Properties
     
-    /// Decoded polyline coordinates for the selected route
-    private var routePolylines: [[CLLocationCoordinate2D]] {
+    /// Decoded polyline coordinates for the selected route, wrapped for ForEach
+    private var routePolylines: [IdentifiablePolyline] {
         guard let route = viewModel.selectedRoute else { return [] }
-        return route.patterns.map { pattern in
-            PolylineDecoder.decode(pattern.encodedPolyline)
+        return route.patterns.enumerated().map { index, pattern in
+            IdentifiablePolyline(
+                id: "\(route.id)-\(index)",
+                coordinates: PolylineDecoder.decode(pattern.encodedPolyline)
+            )
+        }
+    }
+}
+
+// MARK: - Identifiable Polyline Wrapper
+
+struct IdentifiablePolyline: Identifiable {
+    let id: String
+    let coordinates: [CLLocationCoordinate2D]
+}
+
+// MARK: - Floating Info Card
+
+struct FloatingInfoCard: View {
+    @Bindable var viewModel: BusViewModel
+    
+    private var displayBus: Bus? {
+        viewModel.selectedBus ?? viewModel.animatedBuses.first
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Top row: Route label + Live badge
+            HStack {
+                Text("CAMPUS CONNECTOR")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.5))
+                    .tracking(1)
+                
+                Spacer()
+                
+                // Live badge
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 6, height: 6)
+                    Text("LIVE")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.green)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(Color.green.opacity(0.15))
+                )
+            }
+            
+            // Main content
+            if let bus = displayBus {
+                VStack(alignment: .leading, spacing: 4) {
+                    // Destination
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(viewModel.selectedRoute?.color ?? .white)
+                        
+                        Text(bus.destination ?? "En Route")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    
+                    // Subtext with speed and status
+                    HStack(spacing: 12) {
+                        // Speed
+                        Label("\(bus.speed) mph", systemImage: "speedometer")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                        
+                        // Delayed indicator
+                        if bus.delayed {
+                            Label("Delayed", systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.orange)
+                        }
+                        
+                        Spacer()
+                        
+                        // Bus ID
+                        Text("Bus \(bus.id)")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                }
+            } else {
+                Text("Approaching...")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color(white: 0.1).opacity(0.5))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
+        .onTapGesture {
+            // Tap card to clear selection
+            if viewModel.selectedBus != nil {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    viewModel.clearBusSelection()
+                }
+            }
         }
     }
 }
@@ -90,15 +222,23 @@ struct ContentView: View {
 /// OSU red bus marker with heading rotation
 struct BusMarkerView: View {
     let bus: Bus
+    var isSelected: Bool = false
     
     /// OSU Scarlet Red
     private let osuRed = Color(hex: "#BB0000")
     
     var body: some View {
         ZStack {
+            // Selection ring
+            if isSelected {
+                Circle()
+                    .stroke(osuRed, lineWidth: 3)
+                    .frame(width: 50, height: 50)
+            }
+            
             // Outer glow
             Circle()
-                .fill(osuRed.opacity(0.3))
+                .fill(osuRed.opacity(isSelected ? 0.5 : 0.3))
                 .frame(width: 40, height: 40)
             
             // White background stroke
@@ -113,7 +253,9 @@ struct BusMarkerView: View {
                 .foregroundColor(osuRed)
                 .rotationEffect(.degrees(bus.heading))
         }
-        .shadow(color: .black.opacity(0.4), radius: 4, x: 0, y: 2)
+        .scaleEffect(isSelected ? 1.15 : 1.0)
+        .shadow(color: .black.opacity(0.4), radius: isSelected ? 8 : 4, x: 0, y: 2)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
 
