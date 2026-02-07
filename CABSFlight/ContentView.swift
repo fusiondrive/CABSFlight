@@ -26,24 +26,23 @@ struct ContentView: View {
         ZStack {
             // MARK: - Map
             Map(position: $cameraPosition) {
-                // Route polylines
+                // Layer 1: Route polylines (drawn first, on bottom)
                 ForEach(routePolylines) { polyline in
                     MapPolyline(coordinates: polyline.coordinates)
                         .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color.gray.opacity(0.3),
-                                    Color.gray.opacity(0.6),
-                                    Color.gray.opacity(0.3)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ),
-                            style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                            viewModel.selectedRoute?.color ?? .red,
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
                         )
                 }
                 
-                // Bus annotations
+                // Layer 2: Stop annotations (subway station dots)
+                ForEach(routeStops) { stop in
+                    Annotation("", coordinate: stop.coordinate) {
+                        StationDotView(routeColor: viewModel.selectedRoute?.color ?? .red)
+                    }
+                }
+                
+                // Layer 3: Bus annotations (on top)
                 ForEach(viewModel.animatedBuses) { bus in
                     Annotation("", coordinate: bus.coordinate) {
                         BusMarkerView(bus: bus, isSelected: viewModel.selectedBus?.id == bus.id)
@@ -104,6 +103,11 @@ struct ContentView: View {
             )
         }
     }
+    
+    /// Stops for the selected route
+    private var routeStops: [Stop] {
+        viewModel.selectedRoute?.stops ?? []
+    }
 }
 
 // MARK: - Identifiable Polyline Wrapper
@@ -111,6 +115,23 @@ struct ContentView: View {
 struct IdentifiablePolyline: Identifiable {
     let id: String
     let coordinates: [CLLocationCoordinate2D]
+}
+
+// MARK: - Station Dot View (MBTA Subway Style)
+
+struct StationDotView: View {
+    let routeColor: Color
+    
+    var body: some View {
+        Circle()
+            .fill(Color.white)
+            .frame(width: 12, height: 12)
+            .overlay(
+                Circle()
+                    .stroke(routeColor, lineWidth: 2.5)
+            )
+            .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+    }
 }
 
 // MARK: - Floating Info Card
