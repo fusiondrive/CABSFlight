@@ -77,6 +77,7 @@ struct LiquidGlassView: View {
             }
             .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
             .mapControlVisibility(.hidden)
+            .safeAreaPadding(.bottom, 100) // Push Apple Maps logo above buttons
             .ignoresSafeArea() // Map fills entire screen
             .onTapGesture {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
