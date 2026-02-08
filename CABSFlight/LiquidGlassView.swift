@@ -99,13 +99,13 @@ struct LiquidGlassView: View {
                 LiquidHeaderOverlay(viewModel: viewModel)
                 Spacer()
                 LiquidBottomOverlay(viewModel: viewModel)
+                    .zIndex(10) // Elevate above bottom card glow
             }
         }
         .safeAreaInset(edge: .bottom) {
             if !viewModel.animatedBuses.isEmpty {
                 LiquidInfoCard(viewModel: viewModel, onFocusBus: zoomToBus)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                    .zIndex(-1) // Force behind route buttons
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
@@ -268,8 +268,15 @@ struct LiquidInfoCard: View {
     
     private var displayBus: Bus? { viewModel.selectedBus ?? viewModel.animatedBuses.first }
     
+    /// Dynamic corner radius based on device
+    private var cornerRadius: CGFloat { ScreenCornerRadius.current }
+    
+    /// Route color for glow effect
+    private var routeColor: Color { viewModel.selectedRoute?.officialColor ?? .blue }
+    
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Header row
             HStack {
                 Text(viewModel.selectedRoute?.name ?? "BUS ROUTE")
                     .font(.system(size: 11, weight: .semibold))
@@ -284,12 +291,13 @@ struct LiquidInfoCard: View {
                 .background(.green.opacity(0.15), in: Capsule())
             }
             
+            // Bus info
             if let bus = displayBus {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.right.circle.fill")
                             .font(.system(size: 18))
-                            .foregroundColor(viewModel.selectedRoute?.officialColor ?? .blue)
+                            .foregroundColor(routeColor)
                         Text(bus.destination ?? "En Route")
                             .font(.system(size: 22, weight: .bold))
                             .foregroundColor(.primary)
@@ -319,27 +327,39 @@ struct LiquidInfoCard: View {
                 }
             }
         }
-        .padding(.horizontal, 14).padding(.vertical, 12)
+        .padding(.horizontal, 24)
+        .padding(.top, 24)
+        .padding(.bottom, 54) // Keep text safe from Home Indicator
+        // Background 1: Glass Shape (CLIPPED)
         .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    // Glossy gradient overlay
-                    RoundedRectangle(cornerRadius: 20)
-                        .fill(
-                            LinearGradient(
-                                colors: [.white.opacity(0.15), .white.opacity(0.05)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
+            ZStack {
+                // Glass material
+                Rectangle()
+                    .foregroundStyle(.ultraThinMaterial)
+                
+                // Glossy gradient overlay
+                LinearGradient(
+                    colors: [.white.opacity(0.15), .white.opacity(0.05)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(.white.opacity(0.3), lineWidth: 1)
-                )
+                
+                // Border stroke
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         )
-        .shadow(color: .black.opacity(0.25), radius: 25, y: 15)
+        // Background 2: Glow Layer (UNCLIPPED & Behind)
+        .background(
+            routeColor.opacity(0.2) // Subtle ambient glow
+                .blur(radius: 50)
+                .padding(-50) // Let it expand infinitely
+            // NO clipShape here - glow bleeds freely
+        )
+        .ignoresSafeArea(edges: .bottom) // Glass touches bottom
+        .shadow(color: .black.opacity(0.3), radius: 25, y: -5)
+        .padding(.horizontal, 10) // Side margins
     }
 }
 
@@ -415,8 +435,11 @@ struct LiquidBottomOverlay: View {
                             viewModel.selectRoute(route)
                         }
                     }
-                }.padding(.horizontal, 20)
-            }.padding(.vertical, 12)
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 30) // Expand height for glow headroom
+            }
+            .padding(.vertical, -18) // Pull back visually
         }
         .background(
             Rectangle()

@@ -25,6 +25,7 @@
 		AA19AE3E2F380D65001C7CB3 /* Stop.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE212F380D65001C7CB3 /* Stop.swift */; };
 		AA19AE3F2F380D65001C7CB3 /* RoutePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE2B2F380D65001C7CB3 /* RoutePickerView.swift */; };
 		AA19AE402F380D65001C7CB3 /* APIResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE1E2F380D65001C7CB3 /* APIResponse.swift */; };
+		AA19AE422F38105A001C7CB3 /* ScreenCornerRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE412F38105A001C7CB3 /* ScreenCornerRadius.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -47,6 +48,7 @@
 		AA19AE282F380D65001C7CB3 /* CABSAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSAPIService.swift; sourceTree = "<group>"; };
 		AA19AE2A2F380D65001C7CB3 /* MapContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapContainerView.swift; sourceTree = "<group>"; };
 		AA19AE2B2F380D65001C7CB3 /* RoutePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePickerView.swift; sourceTree = "<group>"; };
+		AA19AE412F38105A001C7CB3 /* ScreenCornerRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCornerRadius.swift; sourceTree = "<group>"; };
 		AA1A11212F37B4AA00016C68 /* CABSFlight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CABSFlight.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -70,6 +72,7 @@
 				AA19AE192F380D65001C7CB3 /* ContentView.swift */,
 				AA19AE1A2F380D65001C7CB3 /* LiquidGlassView.swift */,
 				AA19AE1B2F380D65001C7CB3 /* PolylineDecoder.swift */,
+				AA19AE412F38105A001C7CB3 /* ScreenCornerRadius.swift */,
 			);
 			path = CABSFlight;
 			sourceTree = "<group>";
@@ -228,6 +231,7 @@
 				AA19AE372F380D65001C7CB3 /* PolylineDecoder.swift in Sources */,
 				AA19AE382F380D65001C7CB3 /* Bus.swift in Sources */,
 				AA19AE392F380D65001C7CB3 /* Theme.swift in Sources */,
+				AA19AE422F38105A001C7CB3 /* ScreenCornerRadius.swift in Sources */,
 				AA19AE3A2F380D65001C7CB3 /* CABSFlightApp.swift in Sources */,
 				AA19AE3B2F380D65001C7CB3 /* CABSColors.swift in Sources */,
 				AA19AE3C2F380D65001C7CB3 /* BusViewModel.swift in Sources */,
