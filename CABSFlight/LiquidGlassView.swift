@@ -116,6 +116,7 @@ struct LiquidGlassView: View {
             }
             // Dynamic bottom padding: lift buttons when no card, tight when card shown
             .padding(.bottom, viewModel.animatedBuses.isEmpty ? 50 : 8)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.animatedBuses.isEmpty)
             .ignoresSafeArea(.container, edges: .bottom) // Measure from physical screen edge
         }
         .onAppear { viewModel.startTracking() }
