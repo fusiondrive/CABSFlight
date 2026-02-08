@@ -26,7 +26,7 @@ struct LiquidGlassView: View {
     
     var body: some View {
         ZStack {
-            // MARK: - Map
+            // MARK: - Map (Full Screen)
             Map(position: $cameraPosition) {
                 // Layer 1: Route polylines
                 ForEach(routePolylines) { polyline in
@@ -77,7 +77,7 @@ struct LiquidGlassView: View {
             }
             .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
             .mapControlVisibility(.hidden)
-            .ignoresSafeArea()
+            .ignoresSafeArea() // Map fills entire screen
             .onTapGesture {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
                     viewModel.clearBusSelection()
@@ -94,20 +94,29 @@ struct LiquidGlassView: View {
                 }
             }
             
-            // MARK: - Overlay UI
-            VStack(spacing: 0) {
+            // MARK: - Header Overlay (Top)
+            VStack {
                 LiquidHeaderOverlay(viewModel: viewModel)
                 Spacer()
+            }
+            
+            // MARK: - Bottom Overlays (Floating)
+            VStack(spacing: 0) {
+                Spacer()
+                
+                // Route buttons (above card)
                 LiquidBottomOverlay(viewModel: viewModel)
-                    .zIndex(10) // Elevate above bottom card glow
+                    .zIndex(10)
+                
+                // Info card (floating at bottom)
+                if !viewModel.animatedBuses.isEmpty {
+                    LiquidInfoCard(viewModel: viewModel, onFocusBus: zoomToBus)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            if !viewModel.animatedBuses.isEmpty {
-                LiquidInfoCard(viewModel: viewModel, onFocusBus: zoomToBus)
-                    .zIndex(-1) // Force behind route buttons
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            // Dynamic bottom padding: lift buttons when no card, tight when card shown
+            .padding(.bottom, viewModel.animatedBuses.isEmpty ? 50 : 8)
+            .ignoresSafeArea(.container, edges: .bottom) // Measure from physical screen edge
         }
         .onAppear { viewModel.startTracking() }
         .onDisappear { viewModel.stopTracking() }
@@ -328,8 +337,8 @@ struct LiquidInfoCard: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.top, 24)
-        .padding(.bottom, 54) // Keep text safe from Home Indicator
+        .padding(.top, 20)
+        .padding(.bottom, 44) // Home indicator (34pt) + buffer (10pt)
         // Background 1: Glass Shape (CLIPPED)
         .background(
             ZStack {
@@ -359,7 +368,8 @@ struct LiquidInfoCard: View {
         )
         .ignoresSafeArea(edges: .bottom) // Glass touches bottom
         .shadow(color: .black.opacity(0.3), radius: 25, y: -5)
-        .padding(.horizontal, 10) // Side margins
+        .padding(.horizontal, 8) // Tighter side margins
+        .padding(.bottom, 8) // Sink card close to bezel (8pt gap)
     }
 }
 
@@ -441,14 +451,7 @@ struct LiquidBottomOverlay: View {
             }
             .padding(.vertical, -18) // Pull back visually
         }
-        .background(
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .mask(
-                    LinearGradient(colors: [.clear, .black, .black], startPoint: .top, endPoint: .bottom)
-                )
-                .ignoresSafeArea()
-        )
+        // No background - buttons float freely on map
     }
 }
 
