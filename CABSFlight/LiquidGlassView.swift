@@ -1,0 +1,475 @@
+//
+//  LiquidGlassView.swift
+//  CABSFlight
+//
+//  iOS 26+ "Liquid Glass" design with glossy materials and glowing effects
+//
+
+import SwiftUI
+import MapKit
+
+/// Liquid Glass UI for iOS 26+ with glossy materials and 3D effects
+@available(iOS 26, *)
+struct LiquidGlassView: View {
+    @Environment(BusViewModel.self) private var viewModel
+    @State private var selectedStopID: String?
+    
+    @State private var cameraPosition: MapCameraPosition = .region(
+        MKCoordinateRegion(
+            center: BusViewModel.osuCenter,
+            span: MKCoordinateSpan(
+                latitudeDelta: BusViewModel.defaultSpan,
+                longitudeDelta: BusViewModel.defaultSpan
+            )
+        )
+    )
+    
+    var body: some View {
+        ZStack {
+            // MARK: - Map
+            Map(position: $cameraPosition) {
+                // Layer 1: Route polylines
+                ForEach(routePolylines) { polyline in
+                    MapPolyline(coordinates: polyline.coordinates)
+                        .stroke(
+                            viewModel.selectedRoute?.officialColor ?? .red,
+                            style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
+                        )
+                }
+                
+                // Layer 2: Stop annotations
+                ForEach(routeStops) { stop in
+                    Annotation("", coordinate: stop.coordinate, anchor: .bottom) {
+                        LiquidStationView(
+                            stop: stop,
+                            routeColor: viewModel.selectedRoute?.officialColor ?? .red,
+                            isSelected: selectedStopID == stop.id,
+                            onTap: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    selectedStopID = selectedStopID == stop.id ? nil : stop.id
+                                }
+                            }
+                        )
+                    }
+                }
+                
+                // Layer 3: Bus annotations with glossy effect
+                ForEach(viewModel.animatedBuses) { bus in
+                    Annotation("", coordinate: bus.coordinate) {
+                        LiquidBusMarker(
+                            bus: bus,
+                            routeColor: viewModel.selectedRoute?.officialColor ?? .red,
+                            isSelected: viewModel.selectedBus?.id == bus.id
+                        )
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                if viewModel.selectedBus?.id == bus.id {
+                                    viewModel.clearBusSelection()
+                                } else {
+                                    viewModel.selectBus(bus)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
+            .mapControlVisibility(.hidden)
+            .ignoresSafeArea()
+            .onTapGesture {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    viewModel.clearBusSelection()
+                    selectedStopID = nil
+                }
+            }
+            .onChange(of: viewModel.selectedRoute?.id) { _, _ in
+                if let route = viewModel.selectedRoute {
+                    selectedStopID = nil
+                    let region = calculateBoundingRegion(for: route)
+                    withAnimation(.easeInOut(duration: 0.5)) {
+                        cameraPosition = .region(region)
+                    }
+                }
+            }
+            
+            // MARK: - Overlay UI
+            VStack(spacing: 0) {
+                LiquidHeaderOverlay(viewModel: viewModel)
+                Spacer()
+                LiquidBottomOverlay(viewModel: viewModel)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if !viewModel.animatedBuses.isEmpty {
+                LiquidInfoCard(viewModel: viewModel, onFocusBus: zoomToBus)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .onAppear { viewModel.startTracking() }
+        .onDisappear { viewModel.stopTracking() }
+    }
+    
+    // MARK: - Helpers
+    
+    private func zoomToBus(_ bus: Bus) {
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            viewModel.selectBus(bus)
+        }
+        let region = MKCoordinateRegion(
+            center: bus.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
+        )
+        withAnimation(.easeInOut(duration: 0.5)) {
+            cameraPosition = .region(region)
+        }
+    }
+    
+    private var routePolylines: [IdentifiablePolyline] {
+        guard let route = viewModel.selectedRoute else { return [] }
+        return route.patterns.enumerated().map { index, pattern in
+            IdentifiablePolyline(id: "\(route.id)-\(index)", coordinates: PolylineDecoder.decode(pattern.encodedPolyline))
+        }
+    }
+    
+    private var routeStops: [Stop] {
+        viewModel.selectedRoute?.stops ?? []
+    }
+    
+    private func calculateBoundingRegion(for route: Route) -> MKCoordinateRegion {
+        var coords: [CLLocationCoordinate2D] = []
+        for pattern in route.patterns {
+            coords.append(contentsOf: PolylineDecoder.decode(pattern.encodedPolyline))
+        }
+        coords.append(contentsOf: route.stops.map { $0.coordinate })
+        
+        guard !coords.isEmpty else {
+            return MKCoordinateRegion(center: BusViewModel.osuCenter, span: MKCoordinateSpan(latitudeDelta: BusViewModel.defaultSpan, longitudeDelta: BusViewModel.defaultSpan))
+        }
+        
+        let lats = coords.map { $0.latitude }
+        let lngs = coords.map { $0.longitude }
+        let center = CLLocationCoordinate2D(latitude: (lats.min()! + lats.max()!) / 2, longitude: (lngs.min()! + lngs.max()!) / 2)
+        let span = MKCoordinateSpan(latitudeDelta: max((lats.max()! - lats.min()!) * 1.4, 0.005), longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.4, 0.005))
+        return MKCoordinateRegion(center: center, span: span)
+    }
+}
+
+// MARK: - Liquid Glass Components
+
+@available(iOS 26, *)
+struct LiquidStationView: View {
+    let stop: Stop
+    let routeColor: Color
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            if isSelected {
+                Text(stop.name)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().stroke(.white.opacity(0.3), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
+                    .transition(.scale.combined(with: .opacity))
+            }
+            ZStack {
+                Circle()
+                    .fill(.white)
+                    .frame(width: isSelected ? 16 : 12, height: isSelected ? 16 : 12)
+                Circle()
+                    .stroke(routeColor, lineWidth: isSelected ? 3 : 2.5)
+                    .frame(width: isSelected ? 16 : 12, height: isSelected ? 16 : 12)
+                // Glossy highlight
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.white.opacity(0.6), .clear],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: isSelected ? 8 : 6, height: isSelected ? 8 : 6)
+                    .offset(x: -2, y: -2)
+            }
+            .shadow(color: routeColor.opacity(0.4), radius: 4, y: 2)
+        }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
+        .onTapGesture { onTap() }
+    }
+}
+
+@available(iOS 26, *)
+struct LiquidBusMarker: View {
+    let bus: Bus
+    let routeColor: Color
+    var isSelected: Bool = false
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            if isSelected {
+                Text(bus.id)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.primary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .overlay(Capsule().stroke(.white.opacity(0.4), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
+                    .transition(.scale.combined(with: .opacity))
+            }
+            ZStack {
+                // Base circle with route color
+                Circle()
+                    .fill(routeColor)
+                    .frame(width: 22, height: 22)
+                
+                // Glossy overlay
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [.white.opacity(0.5), .clear],
+                            startPoint: .topLeading,
+                            endPoint: .center
+                        )
+                    )
+                    .frame(width: 22, height: 22)
+                
+                // White border with glow
+                Circle()
+                    .strokeBorder(.white, lineWidth: 2)
+                    .frame(width: 22, height: 22)
+                
+                // Navigation arrow
+                Image(systemName: "location.north.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                    .rotationEffect(.degrees(bus.heading == 0 ? 45 : bus.heading))
+                    .shadow(color: .black.opacity(0.3), radius: 1, y: 1)
+            }
+            .shadow(color: routeColor.opacity(0.5), radius: 6, y: 3)
+        }
+        .scaleEffect(isSelected ? 1.4 : 1.0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isSelected)
+    }
+}
+
+@available(iOS 26, *)
+struct LiquidInfoCard: View {
+    @Bindable var viewModel: BusViewModel
+    var onFocusBus: ((Bus) -> Void)?
+    
+    private var displayBus: Bus? { viewModel.selectedBus ?? viewModel.animatedBuses.first }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(viewModel.selectedRoute?.name ?? "BUS ROUTE")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.secondary)
+                    .tracking(1)
+                Spacer()
+                HStack(spacing: 4) {
+                    Circle().fill(.green).frame(width: 6, height: 6)
+                    Text("LIVE").font(.system(size: 10, weight: .bold)).foregroundColor(.green)
+                }
+                .padding(.horizontal, 8).padding(.vertical, 4)
+                .background(.green.opacity(0.15), in: Capsule())
+            }
+            
+            if let bus = displayBus {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.right.circle.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(viewModel.selectedRoute?.officialColor ?? .blue)
+                        Text(bus.destination ?? "En Route")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.primary)
+                    }
+                    HStack(spacing: 12) {
+                        Label("\(bus.speed) mph", systemImage: "speedometer")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.secondary)
+                        if bus.delayed {
+                            Label("Delayed", systemImage: "exclamationmark.triangle.fill")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.orange)
+                        }
+                        Spacer()
+                        Button { onFocusBus?(bus) } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "location.fill").font(.system(size: 10))
+                                Text("Bus \(bus.id)").font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.primary.opacity(0.8))
+                            .padding(.horizontal, 10).padding(.vertical, 5)
+                            .background(.ultraThinMaterial, in: Capsule())
+                            .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    // Glossy gradient overlay
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(
+                            LinearGradient(
+                                colors: [.white.opacity(0.15), .white.opacity(0.05)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .shadow(color: .black.opacity(0.25), radius: 25, y: 15)
+    }
+}
+
+@available(iOS 26, *)
+struct LiquidHeaderOverlay: View {
+    @Bindable var viewModel: BusViewModel
+    
+    var body: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("CABS").font(.system(size: 34, weight: .bold)).foregroundColor(.primary)
+                if let route = viewModel.selectedRoute {
+                    Text(route.name).font(.system(size: 14, weight: .medium)).foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+            if !viewModel.animatedBuses.isEmpty { LiquidLiveBadge() }
+            Button { viewModel.loadMockData() } label: {
+                Image(systemName: "ladybug.fill")
+                    .font(.system(size: 16))
+                    .foregroundColor(.secondary)
+                    .padding(10)
+                    .background(.ultraThinMaterial, in: Circle())
+                    .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
+            }
+        }
+        .padding(.horizontal, 20).padding(.top, 8)
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .mask(
+                    LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom)
+                )
+                .frame(height: 120)
+                .ignoresSafeArea()
+        )
+    }
+}
+
+@available(iOS 26, *)
+struct LiquidLiveBadge: View {
+    @State private var isPulsing = false
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(.green).frame(width: 8, height: 8)
+                .scaleEffect(isPulsing ? 1.3 : 1.0).opacity(isPulsing ? 0.6 : 1.0)
+            Text("LIVE").font(.system(size: 11, weight: .semibold)).foregroundColor(.primary.opacity(0.7))
+        }
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: Capsule())
+        .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 1))
+        .onAppear { withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) { isPulsing = true } }
+    }
+}
+
+@available(iOS 26, *)
+struct LiquidBottomOverlay: View {
+    @Bindable var viewModel: BusViewModel
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            if !viewModel.animatedBuses.isEmpty {
+                HStack {
+                    Image(systemName: "bus.fill").foregroundColor(.secondary)
+                    Text("\(viewModel.animatedBuses.count) buses active")
+                        .font(.system(size: 13, weight: .medium)).foregroundColor(.secondary)
+                }.padding(.bottom, 12)
+            }
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(viewModel.routes) { route in
+                        LiquidRouteChip(route: route, isSelected: viewModel.selectedRoute?.id == route.id) {
+                            viewModel.selectRoute(route)
+                        }
+                    }
+                }.padding(.horizontal, 20)
+            }.padding(.vertical, 12)
+        }
+        .background(
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .mask(
+                    LinearGradient(colors: [.clear, .black, .black], startPoint: .top, endPoint: .bottom)
+                )
+                .ignoresSafeArea()
+        )
+    }
+}
+
+@available(iOS 26, *)
+struct LiquidRouteChip: View {
+    let route: Route
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Circle().fill(route.officialColor).frame(width: 10, height: 10)
+                Text(route.id).font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(isSelected ? .primary : .secondary)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(isSelected ? route.officialColor.opacity(0.2) : .clear)
+                    .background(.ultraThinMaterial, in: Capsule())
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(
+                        isSelected ? route.officialColor : .white.opacity(0.2),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+            )
+            .overlay(
+                // Glossy highlight for 3D liquid effect
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [.white.opacity(isSelected ? 0.3 : 0.15), .clear],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                    )
+                    .padding(2)
+            )
+            .shadow(color: isSelected ? route.officialColor.opacity(0.4) : .clear, radius: 8, y: 4)
+        }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelected)
+    }
+}
