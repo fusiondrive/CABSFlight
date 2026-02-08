@@ -59,22 +59,35 @@ struct ContentView: View {
                 // Layer 3: Bus annotations (on top)
                 ForEach(viewModel.animatedBuses) { bus in
                     Annotation("", coordinate: bus.coordinate) {
-                        BusMarkerView(bus: bus, isSelected: viewModel.selectedBus?.id == bus.id)
-                            .onTapGesture {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                    if viewModel.selectedBus?.id == bus.id {
-                                        viewModel.clearBusSelection()
-                                    } else {
-                                        viewModel.selectBus(bus)
-                                    }
+                        BusMarkerView(
+                            bus: bus,
+                            routeColor: viewModel.selectedRoute?.officialColor ?? .red,
+                            isSelected: viewModel.selectedBus?.id == bus.id
+                        )
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                if viewModel.selectedBus?.id == bus.id {
+                                    viewModel.clearBusSelection()
+                                } else {
+                                    viewModel.selectBus(bus)
                                 }
                             }
+                        }
                     }
                 }
             }
             .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
             .mapControlVisibility(.hidden)
             .ignoresSafeArea()
+            .onTapGesture {
+                // Tap map background to deselect bus
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
+                    viewModel.clearBusSelection()
+                    selectedStopID = nil
+                }
+            }
             .onChange(of: viewModel.selectedRoute?.id) { oldValue, newValue in
                 // Auto-zoom when route changes
                 if let route = viewModel.selectedRoute {
@@ -100,7 +113,9 @@ struct ContentView: View {
         .safeAreaInset(edge: .bottom) {
             // Floating info card
             if !viewModel.animatedBuses.isEmpty {
-                FloatingInfoCard(viewModel: viewModel)
+                FloatingInfoCard(viewModel: viewModel, onFocusBus: { bus in
+                    zoomToBus(bus)
+                })
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -112,6 +127,24 @@ struct ContentView: View {
         }
         .onDisappear {
             viewModel.stopTracking()
+        }
+    }
+    
+    // MARK: - Navigation Methods
+    
+    /// Zoom to focus on a specific bus
+    private func zoomToBus(_ bus: Bus) {
+        // Select the bus
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            viewModel.selectBus(bus)
+        }
+        
+        // Zoom to bus location
+        let closeZoom = MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
+        let region = MKCoordinateRegion(center: bus.coordinate, span: closeZoom)
+        
+        withAnimation(.easeInOut(duration: 0.5)) {
+            cameraPosition = .region(region)
         }
     }
     
@@ -239,6 +272,7 @@ struct StationAnnotationView: View {
 
 struct FloatingInfoCard: View {
     @Bindable var viewModel: BusViewModel
+    var onFocusBus: ((Bus) -> Void)?
     
     private var displayBus: Bus? {
         viewModel.selectedBus ?? viewModel.animatedBuses.first
@@ -248,7 +282,7 @@ struct FloatingInfoCard: View {
         VStack(alignment: .leading, spacing: 8) {
             // Top row: Route label + Live badge
             HStack {
-                Text("CAMPUS CONNECTOR")
+                Text(viewModel.selectedRoute?.name ?? "BUS ROUTE")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
                     .tracking(1)
@@ -302,10 +336,25 @@ struct FloatingInfoCard: View {
                         
                         Spacer()
                         
-                        // Bus ID
-                        Text("Bus \(bus.id)")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(.white.opacity(0.4))
+                        // Tappable Bus ID - focus on this bus
+                        Button {
+                            onFocusBus?(bus)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "location.fill")
+                                    .font(.system(size: 10))
+                                Text("Bus \(bus.id)")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.15))
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             } else {
@@ -329,56 +378,56 @@ struct FloatingInfoCard: View {
                 )
         )
         .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 10)
-        .onTapGesture {
-            // Tap card to clear selection
-            if viewModel.selectedBus != nil {
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    viewModel.clearBusSelection()
-                }
-            }
-        }
     }
 }
 
 // MARK: - Bus Marker View
 
-/// OSU red bus marker with heading rotation
+/// Sleek puck-style bus marker with heading rotation
 struct BusMarkerView: View {
     let bus: Bus
+    let routeColor: Color
     var isSelected: Bool = false
     
-    /// OSU Scarlet Red
-    private let osuRed = Color(hex: "#BB0000")
-    
     var body: some View {
-        ZStack {
-            // Selection ring
+        VStack(spacing: 4) {
+            // ID Label bubble (shown when selected)
             if isSelected {
-                Circle()
-                    .stroke(osuRed, lineWidth: 3)
-                    .frame(width: 50, height: 50)
+                Text(bus.id)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.black)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
+                    .background(
+                        Capsule()
+                            .fill(Color.white)
+                            .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+                    )
+                    .transition(.scale.combined(with: .opacity))
             }
             
-            // Outer glow
-            Circle()
-                .fill(osuRed.opacity(isSelected ? 0.5 : 0.3))
-                .frame(width: 40, height: 40)
-            
-            // White background stroke
-            Image(systemName: "location.north.fill")
-                .font(.system(size: 24, weight: .bold))
-                .foregroundColor(.white)
-                .rotationEffect(.degrees(bus.heading))
-            
-            // Red arrow on top
-            Image(systemName: "location.north.fill")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(osuRed)
-                .rotationEffect(.degrees(bus.heading))
+            // Puck marker (22x22)
+            ZStack {
+                // Main circle with route color
+                Circle()
+                    .fill(routeColor)
+                    .frame(width: 22, height: 22)
+                
+                // White border
+                Circle()
+                    .strokeBorder(Color.white, lineWidth: 2)
+                    .frame(width: 22, height: 22)
+                
+                // Navigation arrow (ignore 0-degree heading to prevent snap-to-north)
+                Image(systemName: "location.north.fill")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white)
+                    .rotationEffect(.degrees(bus.heading == 0 ? 45 : bus.heading))
+            }
+            .shadow(color: .black.opacity(0.35), radius: 3, x: 0, y: 2)
         }
-        .scaleEffect(isSelected ? 1.15 : 1.0)
-        .shadow(color: .black.opacity(0.4), radius: isSelected ? 8 : 4, x: 0, y: 2)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .scaleEffect(isSelected ? 1.4 : 1.0)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isSelected)
     }
 }
 
@@ -539,17 +588,15 @@ struct RouteChip: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(isSelected ? .white : .white.opacity(0.6))
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 16)
             .padding(.vertical, 10)
-            .background(
+            .background(isSelected ? route.officialColor.opacity(0.25) : Color.white.opacity(0.08))
+            .clipShape(Capsule())
+            .overlay(
                 Capsule()
-                    .fill(isSelected ? route.officialColor.opacity(0.25) : Color.white.opacity(0.08))
-                    .overlay(
-                        Capsule()
-                            .stroke(
-                                isSelected ? route.officialColor : Color.white.opacity(0.12),
-                                lineWidth: isSelected ? 1.5 : 1
-                            )
+                    .strokeBorder(
+                        isSelected ? route.officialColor : Color.white.opacity(0.15),
+                        lineWidth: 2
                     )
             )
         }
