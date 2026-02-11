@@ -391,11 +391,10 @@ struct LiquidInfoCard: View {
 
                                 Spacer()
 
-                                // ETA estimate (~1 min per 800m)
-                                let eta = max(1, Int(pred.distance / 800))
-                                Text("\(eta) min away")
+                                // ETA from advanced prediction algorithm
+                                Text(pred.timeDisplay)
                                     .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(.secondary)
+                                    .foregroundColor(pred.timeDisplay == "Arriving" ? .green : .secondary)
                             }
                         }
                     }

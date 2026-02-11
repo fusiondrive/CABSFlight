@@ -299,34 +299,78 @@ final class BusViewModel {
 
     // MARK: - Predictions
 
-    /// Returns nearby buses from all routes that serve the given stop, sorted by distance.
-    func predictions(for stop: Stop) -> [ArrivalPrediction] {
-        // Step 1: Find which routes serve this stop
+    /// Returns predicted arrivals for a stop, accounting for distance, intermediate stops, and dwell time.
+    func predictions(for targetStop: Stop) -> [ArrivalPrediction] {
+        // 1. Identify routes serving this stop
         let servingRoutes = allRoutes.filter { route in
-            route.stops.contains { $0.id == stop.id }
+            route.stops.contains { $0.id == targetStop.id }
         }
 
-        // Step 2: Find vehicles heading toward this stop
         var predictions: [ArrivalPrediction] = []
+        let campusAvgSpeedMps = 6.7  // 15 mph in m/s (conservative campus average)
+        let dwellTimePerStop = 45.0  // Seconds for lights & boarding per intermediate stop
 
         for route in servingRoutes {
+            // Ordered stop IDs for "stops away" calculation
+            let routeStopIDs = route.stops.map { $0.id }
+            guard let targetIndex = routeStopIDs.firstIndex(of: targetStop.id) else { continue }
+
             let routeVehicles = vehicles.filter { $0.routeCode == route.id }
 
             for bus in routeVehicles {
-                let distance = Self.distance(from: bus.coordinate, to: stop.coordinate)
+                // 2. Calculate distance
+                let distance = Self.distance(from: bus.coordinate, to: targetStop.coordinate)
 
-                // Only show buses within ~1 mile (1600 meters)
-                if distance < 1600 {
-                    predictions.append(ArrivalPrediction(bus: bus, route: route, distance: distance))
+                // Only predict for buses within ~2.5 miles (4000m)
+                guard distance < 4000 else { continue }
+
+                // 3. Calculate "stops away" by finding the closest stop to the bus
+                let closestBusStop = route.stops.min(by: {
+                    Self.distance(from: bus.coordinate, to: $0.coordinate)
+                        < Self.distance(from: bus.coordinate, to: $1.coordinate)
+                })
+
+                var stopsAway = 0
+                if let currentBusStop = closestBusStop,
+                   let busIndex = routeStopIDs.firstIndex(of: currentBusStop.id) {
+                    if busIndex < targetIndex {
+                        stopsAway = targetIndex - busIndex
+                    } else {
+                        // Bus has passed the stop or is looping — skip
+                        continue
+                    }
                 }
+
+                // 4. Time calculation: drive time + dwell penalty
+                let driveTime = distance / campusAvgSpeedMps
+                let dwellTotal = Double(stopsAway) * dwellTimePerStop
+                let totalSeconds = driveTime + dwellTotal
+
+                // 5. Status logic (holding / arriving / N min)
+                let minutes = Int(totalSeconds / 60)
+                let statusString: String
+                if bus.speed < 1 && distance > 500 && stopsAway > 2 {
+                    statusString = "Holding"
+                } else if minutes < 1 {
+                    statusString = "Arriving"
+                } else {
+                    statusString = "\(minutes) min"
+                }
+
+                predictions.append(ArrivalPrediction(
+                    bus: bus,
+                    route: route,
+                    timeDisplay: statusString,
+                    rawSeconds: totalSeconds
+                ))
             }
         }
 
-        // Step 3: Sort by nearest distance
-        return predictions.sorted { $0.distance < $1.distance }
+        // Sort by soonest arrival first
+        return predictions.sorted { $0.rawSeconds < $1.rawSeconds }
     }
 
-    /// Haversine distance between two coordinates, in meters.
+    /// Distance between two coordinates in meters.
     private static func distance(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
         let loc1 = CLLocation(latitude: a.latitude, longitude: a.longitude)
         let loc2 = CLLocation(latitude: b.latitude, longitude: b.longitude)
@@ -340,7 +384,8 @@ struct ArrivalPrediction: Identifiable {
     var id: String { "\(bus.id)-\(route.id)" }
     let bus: Bus
     let route: Route
-    let distance: Double // meters
+    let timeDisplay: String  // "Arriving", "Holding", or "N min"
+    let rawSeconds: Double   // Total estimated seconds for sorting
 }
 
 // MARK: - Map Constants
