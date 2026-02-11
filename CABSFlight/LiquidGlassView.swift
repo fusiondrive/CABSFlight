@@ -326,103 +326,101 @@ struct LiquidInfoCard: View {
                 }
             }
             
-            if let bus = selectedVehicle {
-                // Vehicle mode
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.right.circle.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(routeColor)
-                        Text(bus.destination ?? "En Route")
+            // CRITICAL FIX: Group + .id forces SwiftUI to swap views instantly
+            // instead of interpolating between them (which causes text overlap/twitching)
+            Group {
+                if let bus = selectedVehicle {
+                    // Vehicle mode
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(routeColor)
+                            Text(bus.destination ?? "En Route")
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.primary)
+                        }
+                        HStack(spacing: 12) {
+                            Label("\(bus.speed) mph", systemImage: "speedometer")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.secondary)
+                            if bus.delayed {
+                                Label("Delayed", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.orange)
+                            }
+                            Spacer()
+                            Button { onFocusBus?(bus) } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "location.fill").font(.system(size: 10))
+                                    Text("Bus \(bus.id)").font(.system(size: 12, weight: .semibold))
+                                }
+                                .foregroundColor(.primary.opacity(0.8))
+                                .padding(.horizontal, 10).padding(.vertical, 5)
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 1))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                } else if let stop = selectedStop {
+                    // Station mode with multi-route predictions
+                    let preds = viewModel.predictions(for: stop)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(stop.name)
                             .font(.system(size: 22, weight: .bold))
                             .foregroundColor(.primary)
-                    }
-                    HStack(spacing: 12) {
-                        Label("\(bus.speed) mph", systemImage: "speedometer")
-                            .font(.system(size: 13, weight: .medium))
+                        Text("Approaching Buses")
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.secondary)
-                        Label(
-                            "Location \(bus.latitude, specifier: "%.4f"), \(bus.longitude, specifier: "%.4f")",
-                            systemImage: "location"
-                        )
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.secondary)
-                        if bus.delayed {
-                            Label("Delayed", systemImage: "exclamationmark.triangle.fill")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(.orange)
-                        }
-                        Spacer()
-                        Button { onFocusBus?(bus) } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "location.fill").font(.system(size: 10))
-                                Text("Bus \(bus.id)").font(.system(size: 12, weight: .semibold))
+                        if preds.isEmpty {
+                            Text("No buses approaching.")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(preds.prefix(5)) { pred in
+                                HStack(spacing: 8) {
+                                    // Route badge capsule
+                                    Text(pred.route.id)
+                                        .font(.system(size: 11, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(pred.route.officialColor, in: Capsule())
+
+                                    // Bus identifier
+                                    Text("Bus \(pred.bus.id)")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.primary)
+
+                                    Spacer()
+
+                                    // ETA from advanced prediction algorithm
+                                    Text(pred.timeDisplay)
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(pred.timeDisplay == "Arriving" ? .green : .secondary)
+                                }
                             }
-                            .foregroundColor(.primary.opacity(0.8))
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(.ultraThinMaterial, in: Capsule())
-                            .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 1))
                         }
-                        .buttonStyle(.plain)
                     }
-                }
-            } else if let stop = selectedStop {
-                // Station mode with multi-route predictions
-                let preds = viewModel.predictions(for: stop)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(stop.name)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.primary)
-                    Text("Approaching Buses")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.secondary)
-                    if preds.isEmpty {
-                        Text("No buses approaching.")
+                } else if let route = selectedRoute {
+                    // Route mode
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(route.name)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.primary)
+                        Text("\(viewModel.vehicles.count) buses currently active")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.secondary)
-                    } else {
-                        ForEach(preds.prefix(5)) { pred in
-                            HStack(spacing: 8) {
-                                // Route badge capsule
-                                Text(pred.route.id)
-                                    .font(.system(size: 11, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 3)
-                                    .background(pred.route.officialColor, in: Capsule())
-
-                                // Bus identifier
-                                Text("Bus \(pred.bus.id)")
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.primary)
-
-                                Spacer()
-
-                                // ETA from advanced prediction algorithm
-                                Text(pred.timeDisplay)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(pred.timeDisplay == "Arriving" ? .green : .secondary)
-                            }
-                        }
+                        Text("Tap a bus or station for details.")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.secondary)
                     }
                 }
-            } else if let route = selectedRoute {
-                // Route mode
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(route.name)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(.primary)
-                    Text("\(viewModel.vehicles.count) buses currently active")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.secondary)
-                    Text("Tap a bus or station for details.")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.secondary)
-                }
             }
+            .id(statusTitle + (selectedVehicle?.id ?? "") + (selectedStop?.id ?? ""))
+            .transition(.opacity.animation(.easeInOut(duration: 0.15)))
         }
-        .animation(.spring(response: 0.4, dampingFraction: 0.65), value: viewModel.selectedVehicle?.id)
-        .animation(.spring(response: 0.4, dampingFraction: 0.65), value: viewModel.selectedStop?.id)
         .padding(.horizontal, 24)
         .padding(.top, 20)
         .padding(.bottom, 44) // Home indicator (34pt) + buffer (10pt)
@@ -458,8 +456,8 @@ struct LiquidHeaderOverlay: View {
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
                     .padding(10)
-                    .background(.ultraThinMaterial, in: Circle())
-                    .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
+                    .glassEffect(.regular.interactive(true), in: Circle())
+                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
             }
         }
         .padding(.horizontal, 20).padding(.top, 8)
@@ -490,8 +488,8 @@ struct LiquidLiveBadge: View {
             Text("LIVE").font(.system(size: 11, weight: .semibold)).foregroundColor(.primary.opacity(0.7))
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 1))
+        .glassEffect(.regular.interactive(true), in: Capsule())
+        .shadow(color: .green.opacity(0.15), radius: 5, y: 2)
         .onAppear { withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) { isPulsing = true } }
     }
 }
@@ -510,14 +508,16 @@ struct LiquidBottomOverlay: View {
                 }.padding(.bottom, 12)
             }
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(viewModel.routes) { route in
-                        LiquidRouteChip(route: route, isSelected: viewModel.selectedRoute?.id == route.id) {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
-                                if viewModel.selectedRoute?.id == route.id {
-                                    viewModel.deselectRoute()
-                                } else {
-                                    viewModel.selectRoute(route)
+                GlassEffectContainer {
+                    HStack(spacing: 10) {
+                        ForEach(viewModel.routes) { route in
+                            LiquidRouteChip(route: route, isSelected: viewModel.selectedRoute?.id == route.id) {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                    if viewModel.selectedRoute?.id == route.id {
+                                        viewModel.deselectRoute()
+                                    } else {
+                                        viewModel.selectRoute(route)
+                                    }
                                 }
                             }
                         }
@@ -541,17 +541,30 @@ struct LiquidRouteChip: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Circle().fill(route.officialColor).frame(width: 10, height: 10)
-                Text(route.id).font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(isSelected ? .primary : .secondary)
+                // Dot: White when selected (pops against colored glass), Colored when unselected
+                Circle()
+                    .fill(isSelected ? .white : route.officialColor)
+                    .frame(width: 10, height: 10)
+                    .shadow(color: isSelected ? .black.opacity(0.2) : .clear, radius: 2, y: 1)
+
+                // Text: White when selected, Secondary when unselected
+                Text(route.id)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(isSelected ? .white : .secondary)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
             .contentShape(Capsule())
+            // Stained glass effect: tinted when selected, plain when not
             .glassEffect(
-                isSelected ? .regular.tint(route.officialColor) : .regular,
+                isSelected ? .regular.tint(route.officialColor).interactive(true) : .regular.interactive(true),
                 in: Capsule()
             )
-            .shadow(color: isSelected ? route.officialColor.opacity(0.4) : .black.opacity(0.08), radius: isSelected ? 8 : 4, y: isSelected ? 4 : 2)
+            // Colored glow when selected (light passing through the gemstone)
+            .shadow(
+                color: isSelected ? route.officialColor.opacity(0.5) : .black.opacity(0.05),
+                radius: isSelected ? 10 : 4,
+                y: isSelected ? 5 : 2
+            )
         }
         .buttonStyle(.plain)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelected)
