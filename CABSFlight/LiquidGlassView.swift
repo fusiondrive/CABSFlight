@@ -87,57 +87,14 @@ struct LiquidMapLayer: View {
 
     var body: some View {
         Map(position: $cameraPosition) {
-            // Layer 1 (bottom): Route polylines
-            ForEach(routePolylines) { polyline in
-                MapPolyline(coordinates: polyline.coordinates)
-                    .stroke(
-                        viewModel.selectedRoute?.officialColor ?? .red,
-                        style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
-                    )
-            }
-
-            // Layer 2 (middle): Stops — below buses
-            ForEach(routeStops) { stop in
-                Annotation("", coordinate: stop.coordinate, anchor: .center) {
-                    Button(action: { viewModel.selectStop(stop) }) {
-                        LiquidStationView(
-                            routeColor: viewModel.selectedRoute?.officialColor ?? .red,
-                            isSelected: viewModel.selectedStop?.id == stop.id
-                        )
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .zIndex(1)
-                }
-            }
-
-            // Layer 3 (top): Buses — always on top
-            ForEach(viewModel.animatedBuses) { bus in
-                Annotation("", coordinate: bus.coordinate) {
-                    Button(action: {
-                        if viewModel.selectedVehicle?.id == bus.id {
-                            viewModel.selectedVehicle = nil
-                        } else {
-                            viewModel.selectBus(bus)
-                        }
-                    }) {
-                        LiquidBusMarker(
-                            bus: bus,
-                            routeColor: viewModel.selectedRoute?.officialColor ?? .red
-                        )
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .zIndex(100)
-                }
-            }
+            polylineLayer
+            stopLayer
+            busLayer
         }
         .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
-        .safeAreaPadding(.bottom, 100)
-        .ignoresSafeArea()
+        .safeAreaPadding(.bottom, 100) // Push Apple Maps logo above buttons
+        .ignoresSafeArea() // Map fills entire screen
         .onTapGesture {
             viewModel.selectedStop = nil
             viewModel.selectedVehicle = nil
@@ -150,6 +107,57 @@ struct LiquidMapLayer: View {
                 withAnimation(.easeInOut(duration: 0.5)) {
                     cameraPosition = .region(region)
                 }
+            }
+        }
+    }
+
+    @MapContentBuilder
+    private var polylineLayer: some MapContent {
+        ForEach(routePolylines) { polyline in
+            MapPolyline(coordinates: polyline.coordinates)
+                .stroke(
+                    viewModel.selectedRoute?.officialColor ?? .red,
+                    style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
+                )
+        }
+    }
+
+    @MapContentBuilder
+    private var stopLayer: some MapContent {
+        ForEach(routeStops) { stop in
+            Annotation("", coordinate: stop.coordinate, anchor: .center) {
+                LiquidStationView(
+                    routeColor: viewModel.selectedRoute?.officialColor ?? .red,
+                    isSelected: viewModel.selectedStop?.id == stop.id
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    viewModel.selectStop(stop)
+                }
+                .zIndex(1)
+            }
+        }
+    }
+
+    @MapContentBuilder
+    private var busLayer: some MapContent {
+        ForEach(viewModel.animatedBuses) { bus in
+            Annotation("", coordinate: bus.coordinate) {
+                LiquidBusMarker(
+                    bus: bus,
+                    routeColor: viewModel.selectedRoute?.officialColor ?? .red
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if viewModel.selectedVehicle?.id == bus.id {
+                        viewModel.selectedVehicle = nil
+                    } else {
+                        viewModel.selectBus(bus)
+                    }
+                }
+                .zIndex(100)
             }
         }
     }
@@ -326,6 +334,12 @@ struct LiquidInfoCard: View {
                         Label("\(bus.speed) mph", systemImage: "speedometer")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.secondary)
+                        Label(
+                            "Location \(bus.latitude, specifier: "%.4f"), \(bus.longitude, specifier: "%.4f")",
+                            systemImage: "location"
+                        )
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
                         if bus.delayed {
                             Label("Delayed", systemImage: "exclamationmark.triangle.fill")
                                 .font(.system(size: 13, weight: .medium))
