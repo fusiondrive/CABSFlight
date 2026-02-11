@@ -11,7 +11,9 @@ import MapKit
 /// Main entry point that switches between Classic and Liquid Glass UI based on iOS version
 struct ContentView: View {
     @State private var viewModel = BusViewModel()
-    
+    @State private var preferences = UserPreferences()
+    @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
+
     var body: some View {
         Group {
             if #available(iOS 26, *) {
@@ -21,6 +23,13 @@ struct ContentView: View {
                 ClassicFlightyView()
                     .environment(viewModel)
             }
+        }
+        .onAppear {
+            viewModel.userPreferences = preferences
+        }
+        .sheet(isPresented: $showOnboarding) {
+            OnboardingView(viewModel: viewModel, preferences: preferences)
+                .interactiveDismissDisabled()
         }
     }
 }

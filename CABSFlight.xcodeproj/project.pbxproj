@@ -7,49 +7,53 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA19AE2F2F380D65001C7CB3 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA19AE152F380D65001C7CB3 /* Assets.xcassets */; };
-		AA19AE302F380D65001C7CB3 /* BusTrackingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE262F380D65001C7CB3 /* BusTrackingViewModel.swift */; };
-		AA19AE312F380D65001C7CB3 /* Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE202F380D65001C7CB3 /* Route.swift */; };
-		AA19AE322F380D65001C7CB3 /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE232F380D65001C7CB3 /* GlassCard.swift */; };
-		AA19AE332F380D65001C7CB3 /* ClassicFlightyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE182F380D65001C7CB3 /* ClassicFlightyView.swift */; };
-		AA19AE342F380D65001C7CB3 /* MapContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE2A2F380D65001C7CB3 /* MapContainerView.swift */; };
-		AA19AE352F380D65001C7CB3 /* CABSAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE282F380D65001C7CB3 /* CABSAPIService.swift */; };
-		AA19AE362F380D65001C7CB3 /* LiquidGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE1A2F380D65001C7CB3 /* LiquidGlassView.swift */; };
-		AA19AE372F380D65001C7CB3 /* PolylineDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE1B2F380D65001C7CB3 /* PolylineDecoder.swift */; };
-		AA19AE382F380D65001C7CB3 /* Bus.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE1F2F380D65001C7CB3 /* Bus.swift */; };
-		AA19AE392F380D65001C7CB3 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE242F380D65001C7CB3 /* Theme.swift */; };
-		AA19AE3A2F380D65001C7CB3 /* CABSFlightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE172F380D65001C7CB3 /* CABSFlightApp.swift */; };
-		AA19AE3B2F380D65001C7CB3 /* CABSColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE162F380D65001C7CB3 /* CABSColors.swift */; };
-		AA19AE3C2F380D65001C7CB3 /* BusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE272F380D65001C7CB3 /* BusViewModel.swift */; };
-		AA19AE3D2F380D65001C7CB3 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE192F380D65001C7CB3 /* ContentView.swift */; };
-		AA19AE3E2F380D65001C7CB3 /* Stop.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE212F380D65001C7CB3 /* Stop.swift */; };
-		AA19AE3F2F380D65001C7CB3 /* RoutePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE2B2F380D65001C7CB3 /* RoutePickerView.swift */; };
-		AA19AE402F380D65001C7CB3 /* APIResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE1E2F380D65001C7CB3 /* APIResponse.swift */; };
-		AA19AE422F38105A001C7CB3 /* ScreenCornerRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA19AE412F38105A001C7CB3 /* ScreenCornerRadius.swift */; };
+		AAFF9DEE2F3CF92C00E03F68 /* Stop.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DDD2F3CF92C00E03F68 /* Stop.swift */; };
+		AAFF9DEF2F3CF92C00E03F68 /* RoutePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DEA2F3CF92C00E03F68 /* RoutePickerView.swift */; };
+		AAFF9DF02F3CF92C00E03F68 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DD42F3CF92C00E03F68 /* ContentView.swift */; };
+		AAFF9DF12F3CF92C00E03F68 /* CABSAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DE52F3CF92C00E03F68 /* CABSAPIService.swift */; };
+		AAFF9DF22F3CF92C00E03F68 /* ScreenCornerRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DD72F3CF92C00E03F68 /* ScreenCornerRadius.swift */; };
+		AAFF9DF32F3CF92C00E03F68 /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DE02F3CF92C00E03F68 /* GlassCard.swift */; };
+		AAFF9DF42F3CF92C00E03F68 /* LiquidGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DD52F3CF92C00E03F68 /* LiquidGlassView.swift */; };
+		AAFF9DF52F3CF92C00E03F68 /* MapContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DE82F3CF92C00E03F68 /* MapContainerView.swift */; };
+		AAFF9DF62F3CF92C00E03F68 /* BusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DE42F3CF92C00E03F68 /* BusViewModel.swift */; };
+		AAFF9DF72F3CF92C00E03F68 /* Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DDC2F3CF92C00E03F68 /* Route.swift */; };
+		AAFF9DF82F3CF92C00E03F68 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DE12F3CF92C00E03F68 /* Theme.swift */; };
+		AAFF9DF92F3CF92C00E03F68 /* Bus.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DDB2F3CF92C00E03F68 /* Bus.swift */; };
+		AAFF9DFA2F3CF92C00E03F68 /* APIResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DDA2F3CF92C00E03F68 /* APIResponse.swift */; };
+		AAFF9DFB2F3CF92C00E03F68 /* CABSFlightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DD22F3CF92C00E03F68 /* CABSFlightApp.swift */; };
+		AAFF9DFC2F3CF92C00E03F68 /* CABSColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DD12F3CF92C00E03F68 /* CABSColors.swift */; };
+		AAFF9DFD2F3CF92C00E03F68 /* UserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DE62F3CF92C00E03F68 /* UserPreferences.swift */; };
+		AAFF9DFE2F3CF92C00E03F68 /* PolylineDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DD62F3CF92C00E03F68 /* PolylineDecoder.swift */; };
+		AAFF9DFF2F3CF92C00E03F68 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DE92F3CF92C00E03F68 /* OnboardingView.swift */; };
+		AAFF9E002F3CF92C00E03F68 /* ClassicFlightyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DD32F3CF92C00E03F68 /* ClassicFlightyView.swift */; };
+		AAFF9E012F3CF92C00E03F68 /* BusTrackingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9DE32F3CF92C00E03F68 /* BusTrackingViewModel.swift */; };
+		AAFF9E022F3CF92C00E03F68 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AAFF9DD02F3CF92C00E03F68 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		AA19AE152F380D65001C7CB3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		AA19AE162F380D65001C7CB3 /* CABSColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSColors.swift; sourceTree = "<group>"; };
-		AA19AE172F380D65001C7CB3 /* CABSFlightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSFlightApp.swift; sourceTree = "<group>"; };
-		AA19AE182F380D65001C7CB3 /* ClassicFlightyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicFlightyView.swift; sourceTree = "<group>"; };
-		AA19AE192F380D65001C7CB3 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		AA19AE1A2F380D65001C7CB3 /* LiquidGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassView.swift; sourceTree = "<group>"; };
-		AA19AE1B2F380D65001C7CB3 /* PolylineDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolylineDecoder.swift; sourceTree = "<group>"; };
-		AA19AE1D2F380D65001C7CB3 /* CABSFlight.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = CABSFlight.xcodeproj; sourceTree = "<group>"; };
-		AA19AE1E2F380D65001C7CB3 /* APIResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIResponse.swift; sourceTree = "<group>"; };
-		AA19AE1F2F380D65001C7CB3 /* Bus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bus.swift; sourceTree = "<group>"; };
-		AA19AE202F380D65001C7CB3 /* Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Route.swift; sourceTree = "<group>"; };
-		AA19AE212F380D65001C7CB3 /* Stop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stop.swift; sourceTree = "<group>"; };
-		AA19AE232F380D65001C7CB3 /* GlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
-		AA19AE242F380D65001C7CB3 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		AA19AE262F380D65001C7CB3 /* BusTrackingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusTrackingViewModel.swift; sourceTree = "<group>"; };
-		AA19AE272F380D65001C7CB3 /* BusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusViewModel.swift; sourceTree = "<group>"; };
-		AA19AE282F380D65001C7CB3 /* CABSAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSAPIService.swift; sourceTree = "<group>"; };
-		AA19AE2A2F380D65001C7CB3 /* MapContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapContainerView.swift; sourceTree = "<group>"; };
-		AA19AE2B2F380D65001C7CB3 /* RoutePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePickerView.swift; sourceTree = "<group>"; };
-		AA19AE412F38105A001C7CB3 /* ScreenCornerRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCornerRadius.swift; sourceTree = "<group>"; };
 		AA1A11212F37B4AA00016C68 /* CABSFlight.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CABSFlight.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AAFF9DD02F3CF92C00E03F68 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AAFF9DD12F3CF92C00E03F68 /* CABSColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSColors.swift; sourceTree = "<group>"; };
+		AAFF9DD22F3CF92C00E03F68 /* CABSFlightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSFlightApp.swift; sourceTree = "<group>"; };
+		AAFF9DD32F3CF92C00E03F68 /* ClassicFlightyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicFlightyView.swift; sourceTree = "<group>"; };
+		AAFF9DD42F3CF92C00E03F68 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AAFF9DD52F3CF92C00E03F68 /* LiquidGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassView.swift; sourceTree = "<group>"; };
+		AAFF9DD62F3CF92C00E03F68 /* PolylineDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolylineDecoder.swift; sourceTree = "<group>"; };
+		AAFF9DD72F3CF92C00E03F68 /* ScreenCornerRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCornerRadius.swift; sourceTree = "<group>"; };
+		AAFF9DD92F3CF92C00E03F68 /* CABSFlight.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = CABSFlight.xcodeproj; sourceTree = "<group>"; };
+		AAFF9DDA2F3CF92C00E03F68 /* APIResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIResponse.swift; sourceTree = "<group>"; };
+		AAFF9DDB2F3CF92C00E03F68 /* Bus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bus.swift; sourceTree = "<group>"; };
+		AAFF9DDC2F3CF92C00E03F68 /* Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Route.swift; sourceTree = "<group>"; };
+		AAFF9DDD2F3CF92C00E03F68 /* Stop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stop.swift; sourceTree = "<group>"; };
+		AAFF9DE02F3CF92C00E03F68 /* GlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
+		AAFF9DE12F3CF92C00E03F68 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		AAFF9DE32F3CF92C00E03F68 /* BusTrackingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusTrackingViewModel.swift; sourceTree = "<group>"; };
+		AAFF9DE42F3CF92C00E03F68 /* BusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusViewModel.swift; sourceTree = "<group>"; };
+		AAFF9DE52F3CF92C00E03F68 /* CABSAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSAPIService.swift; sourceTree = "<group>"; };
+		AAFF9DE62F3CF92C00E03F68 /* UserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPreferences.swift; sourceTree = "<group>"; };
+		AAFF9DE82F3CF92C00E03F68 /* MapContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapContainerView.swift; sourceTree = "<group>"; };
+		AAFF9DE92F3CF92C00E03F68 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		AAFF9DEA2F3CF92C00E03F68 /* RoutePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePickerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,74 +67,17 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		AA19AE1C2F380D65001C7CB3 /* CABSFlight */ = {
-			isa = PBXGroup;
-			children = (
-				AA19AE162F380D65001C7CB3 /* CABSColors.swift */,
-				AA19AE172F380D65001C7CB3 /* CABSFlightApp.swift */,
-				AA19AE182F380D65001C7CB3 /* ClassicFlightyView.swift */,
-				AA19AE192F380D65001C7CB3 /* ContentView.swift */,
-				AA19AE1A2F380D65001C7CB3 /* LiquidGlassView.swift */,
-				AA19AE1B2F380D65001C7CB3 /* PolylineDecoder.swift */,
-				AA19AE412F38105A001C7CB3 /* ScreenCornerRadius.swift */,
-			);
-			path = CABSFlight;
-			sourceTree = "<group>";
-		};
-		AA19AE222F380D65001C7CB3 /* Models */ = {
-			isa = PBXGroup;
-			children = (
-				AA19AE1E2F380D65001C7CB3 /* APIResponse.swift */,
-				AA19AE1F2F380D65001C7CB3 /* Bus.swift */,
-				AA19AE202F380D65001C7CB3 /* Route.swift */,
-				AA19AE212F380D65001C7CB3 /* Stop.swift */,
-			);
-			path = Models;
-			sourceTree = "<group>";
-		};
-		AA19AE252F380D65001C7CB3 /* Theme */ = {
-			isa = PBXGroup;
-			children = (
-				AA19AE232F380D65001C7CB3 /* GlassCard.swift */,
-				AA19AE242F380D65001C7CB3 /* Theme.swift */,
-			);
-			path = Theme;
-			sourceTree = "<group>";
-		};
-		AA19AE292F380D65001C7CB3 /* ViewModels */ = {
-			isa = PBXGroup;
-			children = (
-				AA19AE262F380D65001C7CB3 /* BusTrackingViewModel.swift */,
-				AA19AE272F380D65001C7CB3 /* BusViewModel.swift */,
-				AA19AE282F380D65001C7CB3 /* CABSAPIService.swift */,
-			);
-			path = ViewModels;
-			sourceTree = "<group>";
-		};
-		AA19AE2C2F380D65001C7CB3 /* Views */ = {
-			isa = PBXGroup;
-			children = (
-				AA19AE2A2F380D65001C7CB3 /* MapContainerView.swift */,
-				AA19AE2B2F380D65001C7CB3 /* RoutePickerView.swift */,
-			);
-			path = Views;
-			sourceTree = "<group>";
-		};
-		AA19AE2D2F380D65001C7CB3 /* Products */ = {
-			isa = PBXGroup;
-			name = Products;
-			sourceTree = "<group>";
-		};
 		AA1A11182F37B4AA00016C68 = {
 			isa = PBXGroup;
 			children = (
-				AA19AE152F380D65001C7CB3 /* Assets.xcassets */,
-				AA19AE1C2F380D65001C7CB3 /* CABSFlight */,
-				AA19AE1D2F380D65001C7CB3 /* CABSFlight.xcodeproj */,
-				AA19AE222F380D65001C7CB3 /* Models */,
-				AA19AE252F380D65001C7CB3 /* Theme */,
-				AA19AE292F380D65001C7CB3 /* ViewModels */,
-				AA19AE2C2F380D65001C7CB3 /* Views */,
+				AAFF9DD02F3CF92C00E03F68 /* Assets.xcassets */,
+				AAFF9DD82F3CF92C00E03F68 /* CABSFlight */,
+				AAFF9DD92F3CF92C00E03F68 /* CABSFlight.xcodeproj */,
+				AAFF9DDE2F3CF92C00E03F68 /* Models */,
+				AAFF9DDF2F3CF92C00E03F68 /* Services */,
+				AAFF9DE22F3CF92C00E03F68 /* Theme */,
+				AAFF9DE72F3CF92C00E03F68 /* ViewModels */,
+				AAFF9DEB2F3CF92C00E03F68 /* Views */,
 				AA1A11222F37B4AA00016C68 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -140,6 +87,73 @@
 			children = (
 				AA1A11212F37B4AA00016C68 /* CABSFlight.app */,
 			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		AAFF9DD82F3CF92C00E03F68 /* CABSFlight */ = {
+			isa = PBXGroup;
+			children = (
+				AAFF9DD12F3CF92C00E03F68 /* CABSColors.swift */,
+				AAFF9DD22F3CF92C00E03F68 /* CABSFlightApp.swift */,
+				AAFF9DD32F3CF92C00E03F68 /* ClassicFlightyView.swift */,
+				AAFF9DD42F3CF92C00E03F68 /* ContentView.swift */,
+				AAFF9DD52F3CF92C00E03F68 /* LiquidGlassView.swift */,
+				AAFF9DD62F3CF92C00E03F68 /* PolylineDecoder.swift */,
+				AAFF9DD72F3CF92C00E03F68 /* ScreenCornerRadius.swift */,
+			);
+			path = CABSFlight;
+			sourceTree = "<group>";
+		};
+		AAFF9DDE2F3CF92C00E03F68 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				AAFF9DDA2F3CF92C00E03F68 /* APIResponse.swift */,
+				AAFF9DDB2F3CF92C00E03F68 /* Bus.swift */,
+				AAFF9DDC2F3CF92C00E03F68 /* Route.swift */,
+				AAFF9DDD2F3CF92C00E03F68 /* Stop.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		AAFF9DDF2F3CF92C00E03F68 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		AAFF9DE22F3CF92C00E03F68 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				AAFF9DE02F3CF92C00E03F68 /* GlassCard.swift */,
+				AAFF9DE12F3CF92C00E03F68 /* Theme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		AAFF9DE72F3CF92C00E03F68 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				AAFF9DE32F3CF92C00E03F68 /* BusTrackingViewModel.swift */,
+				AAFF9DE42F3CF92C00E03F68 /* BusViewModel.swift */,
+				AAFF9DE52F3CF92C00E03F68 /* CABSAPIService.swift */,
+				AAFF9DE62F3CF92C00E03F68 /* UserPreferences.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		AAFF9DEB2F3CF92C00E03F68 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				AAFF9DE82F3CF92C00E03F68 /* MapContainerView.swift */,
+				AAFF9DE92F3CF92C00E03F68 /* OnboardingView.swift */,
+				AAFF9DEA2F3CF92C00E03F68 /* RoutePickerView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		AAFF9DEC2F3CF92C00E03F68 /* Products */ = {
+			isa = PBXGroup;
 			name = Products;
 			sourceTree = "<group>";
 		};
@@ -194,8 +208,8 @@
 			projectDirPath = "";
 			projectReferences = (
 				{
-					ProductGroup = AA19AE2D2F380D65001C7CB3 /* Products */;
-					ProjectRef = AA19AE1D2F380D65001C7CB3 /* CABSFlight.xcodeproj */;
+					ProductGroup = AAFF9DEC2F3CF92C00E03F68 /* Products */;
+					ProjectRef = AAFF9DD92F3CF92C00E03F68 /* CABSFlight.xcodeproj */;
 				},
 			);
 			projectRoot = "";
@@ -210,7 +224,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA19AE2F2F380D65001C7CB3 /* Assets.xcassets in Resources */,
+				AAFF9E022F3CF92C00E03F68 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,24 +235,26 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AA19AE302F380D65001C7CB3 /* BusTrackingViewModel.swift in Sources */,
-				AA19AE312F380D65001C7CB3 /* Route.swift in Sources */,
-				AA19AE322F380D65001C7CB3 /* GlassCard.swift in Sources */,
-				AA19AE332F380D65001C7CB3 /* ClassicFlightyView.swift in Sources */,
-				AA19AE342F380D65001C7CB3 /* MapContainerView.swift in Sources */,
-				AA19AE352F380D65001C7CB3 /* CABSAPIService.swift in Sources */,
-				AA19AE362F380D65001C7CB3 /* LiquidGlassView.swift in Sources */,
-				AA19AE372F380D65001C7CB3 /* PolylineDecoder.swift in Sources */,
-				AA19AE382F380D65001C7CB3 /* Bus.swift in Sources */,
-				AA19AE392F380D65001C7CB3 /* Theme.swift in Sources */,
-				AA19AE422F38105A001C7CB3 /* ScreenCornerRadius.swift in Sources */,
-				AA19AE3A2F380D65001C7CB3 /* CABSFlightApp.swift in Sources */,
-				AA19AE3B2F380D65001C7CB3 /* CABSColors.swift in Sources */,
-				AA19AE3C2F380D65001C7CB3 /* BusViewModel.swift in Sources */,
-				AA19AE3D2F380D65001C7CB3 /* ContentView.swift in Sources */,
-				AA19AE3E2F380D65001C7CB3 /* Stop.swift in Sources */,
-				AA19AE3F2F380D65001C7CB3 /* RoutePickerView.swift in Sources */,
-				AA19AE402F380D65001C7CB3 /* APIResponse.swift in Sources */,
+				AAFF9DEE2F3CF92C00E03F68 /* Stop.swift in Sources */,
+				AAFF9DEF2F3CF92C00E03F68 /* RoutePickerView.swift in Sources */,
+				AAFF9DF02F3CF92C00E03F68 /* ContentView.swift in Sources */,
+				AAFF9DF12F3CF92C00E03F68 /* CABSAPIService.swift in Sources */,
+				AAFF9DF22F3CF92C00E03F68 /* ScreenCornerRadius.swift in Sources */,
+				AAFF9DF32F3CF92C00E03F68 /* GlassCard.swift in Sources */,
+				AAFF9DF42F3CF92C00E03F68 /* LiquidGlassView.swift in Sources */,
+				AAFF9DF52F3CF92C00E03F68 /* MapContainerView.swift in Sources */,
+				AAFF9DF62F3CF92C00E03F68 /* BusViewModel.swift in Sources */,
+				AAFF9DF72F3CF92C00E03F68 /* Route.swift in Sources */,
+				AAFF9DF82F3CF92C00E03F68 /* Theme.swift in Sources */,
+				AAFF9DF92F3CF92C00E03F68 /* Bus.swift in Sources */,
+				AAFF9DFA2F3CF92C00E03F68 /* APIResponse.swift in Sources */,
+				AAFF9DFB2F3CF92C00E03F68 /* CABSFlightApp.swift in Sources */,
+				AAFF9DFC2F3CF92C00E03F68 /* CABSColors.swift in Sources */,
+				AAFF9DFD2F3CF92C00E03F68 /* UserPreferences.swift in Sources */,
+				AAFF9DFE2F3CF92C00E03F68 /* PolylineDecoder.swift in Sources */,
+				AAFF9DFF2F3CF92C00E03F68 /* OnboardingView.swift in Sources */,
+				AAFF9E002F3CF92C00E03F68 /* ClassicFlightyView.swift in Sources */,
+				AAFF9E012F3CF92C00E03F68 /* BusTrackingViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

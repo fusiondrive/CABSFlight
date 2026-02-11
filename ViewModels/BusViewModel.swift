@@ -14,45 +14,57 @@ import Observation
 @MainActor
 final class BusViewModel {
     // MARK: - Public Properties
-    
+
+    /// All routes fetched from API (unfiltered – used by onboarding)
+    private(set) var allRoutes: [Route] = []
+
+    /// Filtered routes based on user preferences (displayed in route chips)
     var routes: [Route] = []
+
     var selectedRoute: Route?
     var selectedBus: Bus?
     var buses: [Bus] = []
     var animatedBuses: [Bus] = []
     var isLoading = false
     var error: String?
-    
+
+    /// Injected user preferences for route visibility filtering
+    var userPreferences: UserPreferences?
+
     // MARK: - Private Properties
-    
+
     private var pollingTask: Task<Void, Never>?
     private var animationTask: Task<Void, Never>?
     private var targetBuses: [Bus] = []
+    private var isTracking = false
     private let pollingInterval: UInt64 = 3_000_000_000 // 3 seconds in nanoseconds
     private let animationDuration: Double = 0.8
-    
+
     // MARK: - Initialization
-    
+
     init() {}
-    
+
     // MARK: - Public Methods
-    
+
     /// Start tracking buses with automatic polling
     func startTracking() {
+        guard !isTracking else { return }
+        isTracking = true
         Task {
             await loadRoutes()
         }
         startPolling()
     }
-    
+
     /// Stop tracking and cancel all tasks
     func stopTracking() {
+        isTracking = false
         pollingTask?.cancel()
         pollingTask = nil
         animationTask?.cancel()
         animationTask = nil
     }
-    
+
     /// Select a route and fetch its buses and route details
     func selectRoute(_ route: Route) {
         selectedRoute = route
@@ -64,17 +76,38 @@ final class BusViewModel {
             await fetchBuses()
         }
     }
-    
+
     /// Select a specific bus to show in the info card
     func selectBus(_ bus: Bus) {
         selectedBus = bus
     }
-    
+
     /// Clear bus selection
     func clearBusSelection() {
         selectedBus = nil
     }
-    
+
+    /// Re-filter `routes` from `allRoutes` using current user preferences.
+    /// Call this after preferences change (e.g., after onboarding finishes).
+    func applyRouteFilter() {
+        if let prefs = userPreferences, !prefs.visibleRouteIDs.isEmpty {
+            routes = allRoutes.filter { prefs.isRouteVisible(id: $0.id) }
+        } else {
+            routes = allRoutes
+        }
+
+        // If the currently selected route is no longer visible, switch
+        if let selected = selectedRoute, !routes.contains(where: { $0.id == selected.id }) {
+            if let first = routes.first {
+                selectRoute(first)
+            } else {
+                selectedRoute = nil
+                buses = []
+                animatedBuses = []
+            }
+        }
+    }
+
     /// Load mock data for testing (useful when API returns empty at night)
     func loadMockData() {
         let mockBuses: [Bus] = [
@@ -118,20 +151,21 @@ final class BusViewModel {
                 lastUpdated: Date()
             )
         ]
-        
+
         buses = mockBuses
         animatedBuses = mockBuses
         targetBuses = mockBuses
     }
-    
+
     // MARK: - Private Methods
-    
+
     private func loadRoutes() async {
         isLoading = true
         error = nil
-        
+
         do {
-            routes = try await CABSAPIService.shared.fetchAllRoutes()
+            allRoutes = try await CABSAPIService.shared.fetchAllRoutes()
+            applyRouteFilter()
             if selectedRoute == nil, let first = routes.first {
                 selectedRoute = first
                 await fetchRouteDetails(code: first.id)
@@ -140,50 +174,51 @@ final class BusViewModel {
         } catch {
             self.error = error.localizedDescription
         }
-        
+
         isLoading = false
     }
-    
+
     private func fetchRouteDetails(code: String) async {
         do {
             let detailedRoute = try await CABSAPIService.shared.fetchRouteDetails(code: code)
             // Update the selected route with patterns and stops
             selectedRoute = detailedRoute
-            // Also update in routes array
-            if let index = routes.firstIndex(where: { $0.id == code }) {
-                routes[index] = detailedRoute
+            // Update in allRoutes array
+            if let index = allRoutes.firstIndex(where: { $0.id == code }) {
+                allRoutes[index] = detailedRoute
             }
+            applyRouteFilter()
         } catch {
             self.error = error.localizedDescription
         }
     }
-    
+
     private func fetchBuses() async {
         guard let routeCode = selectedRoute?.id else { return }
-        
+
         do {
             let newBuses = try await CABSAPIService.shared.fetchVehicles(routeCode: routeCode)
-            
+
             // If empty and no buses, don't update (allows mock data to persist)
             if newBuses.isEmpty && buses.isEmpty {
                 return
             }
-            
+
             targetBuses = newBuses
             await animateToBuses(newBuses)
-            
+
         } catch {
             self.error = error.localizedDescription
         }
     }
-    
+
     private func startPolling() {
         pollingTask?.cancel()
-        
+
         pollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.fetchBuses()
-                
+
                 do {
                     try await Task.sleep(nanoseconds: self?.pollingInterval ?? 3_000_000_000)
                 } catch {
@@ -192,41 +227,41 @@ final class BusViewModel {
             }
         }
     }
-    
+
     private func animateToBuses(_ newBuses: [Bus]) async {
         animationTask?.cancel()
-        
+
         let startBuses = animatedBuses.isEmpty ? newBuses : animatedBuses
         let startTime = Date()
-        
+
         animationTask = Task { [weak self] in
             guard let self = self else { return }
-            
+
             while !Task.isCancelled {
                 let elapsed = Date().timeIntervalSince(startTime)
                 let progress = min(elapsed / self.animationDuration, 1.0)
-                
+
                 // Ease-out cubic
                 let easedProgress = 1 - pow(1 - progress, 3)
-                
+
                 self.animatedBuses = self.interpolateBuses(
                     from: startBuses,
                     to: newBuses,
                     progress: easedProgress
                 )
-                
+
                 if progress >= 1.0 {
                     self.buses = newBuses
                     self.animatedBuses = newBuses
                     break
                 }
-                
+
                 // ~60 FPS
                 try? await Task.sleep(nanoseconds: 16_666_667)
             }
         }
     }
-    
+
     private func interpolateBuses(from: [Bus], to: [Bus], progress: Double) -> [Bus] {
         to.map { targetBus in
             if let sourceBus = from.first(where: { $0.id == targetBus.id }) {
@@ -242,7 +277,7 @@ final class BusViewModel {
 extension BusViewModel {
     /// OSU campus center coordinates
     static let osuCenter = CLLocationCoordinate2D(latitude: 40.0067, longitude: -83.0305)
-    
+
     /// Default map span for campus view
     static let defaultSpan = 0.025
 }
