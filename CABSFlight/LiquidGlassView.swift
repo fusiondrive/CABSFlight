@@ -46,7 +46,14 @@ struct LiquidGlassView: View {
                 // Info card (floating at bottom)
                 if shouldShowInfoCard {
                     LiquidInfoCard(viewModel: viewModel, onFocusBus: zoomToBus)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .transition(
+                            .asymmetric(
+                                insertion: .move(edge: .bottom).combined(with: .opacity)
+                                    .animation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0)),
+                                removal: .move(edge: .bottom).combined(with: .opacity)
+                                    .animation(.easeOut(duration: 0.2))
+                            )
+                        )
                 }
             }
             // Dynamic bottom padding: lift buttons when no card, tight when card shown
@@ -414,38 +421,18 @@ struct LiquidInfoCard: View {
                 }
             }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.65), value: viewModel.selectedVehicle?.id)
+        .animation(.spring(response: 0.4, dampingFraction: 0.65), value: viewModel.selectedStop?.id)
         .padding(.horizontal, 24)
         .padding(.top, 20)
         .padding(.bottom, 44) // Home indicator (34pt) + buffer (10pt)
-        // Background 1: Glass Shape (CLIPPED)
-        .background(
-            ZStack {
-                // Glass material
-                Rectangle()
-                    .foregroundStyle(.ultraThinMaterial)
-                
-                // Glossy gradient overlay
-                LinearGradient(
-                    colors: [.white.opacity(0.15), .white.opacity(0.05)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                
-                // Border stroke
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.3), lineWidth: 1)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        // Native iOS 26 Liquid Glass effect
+        .glassEffect(
+            .regular.tint(routeColor.opacity(0.1)),
+            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         )
-        // Background 2: Glow Layer (UNCLIPPED & Behind)
-        .background(
-            routeColor.opacity(0.2) // Subtle ambient glow
-                .blur(radius: 50)
-                .padding(-50) // Let it expand infinitely
-            // NO clipShape here - glow bleeds freely
-        )
+        .shadow(color: .black.opacity(0.15), radius: 15, y: 8)
         .ignoresSafeArea(edges: .bottom) // Glass touches bottom
-        .shadow(color: .black.opacity(0.3), radius: 25, y: -5)
         .padding(.horizontal, 8) // Tighter side margins
         .padding(.bottom, 8) // Sink card close to bezel (8pt gap)
     }
@@ -559,33 +546,12 @@ struct LiquidRouteChip: View {
                     .foregroundColor(isSelected ? .primary : .secondary)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
-            .contentShape(Capsule()) // Fill empty space with tappable area
-            .background(
-                Capsule()
-                    .fill(isSelected ? route.officialColor.opacity(0.2) : .clear)
-                    .background(.ultraThinMaterial, in: Capsule())
+            .contentShape(Capsule())
+            .glassEffect(
+                isSelected ? .regular.tint(route.officialColor) : .regular,
+                in: Capsule()
             )
-            .overlay(
-                Capsule()
-                    .strokeBorder(
-                        isSelected ? route.officialColor : .white.opacity(0.2),
-                        lineWidth: isSelected ? 2 : 1
-                    )
-            )
-            .overlay(
-                // Glossy highlight for 3D liquid effect
-                Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [.white.opacity(isSelected ? 0.3 : 0.15), .clear],
-                            startPoint: .top,
-                            endPoint: .center
-                        )
-                    )
-                    .padding(2)
-                    .allowsHitTesting(false) // Don't let overlays steal taps
-            )
-            .shadow(color: isSelected ? route.officialColor.opacity(0.4) : .clear, radius: 8, y: 4)
+            .shadow(color: isSelected ? route.officialColor.opacity(0.4) : .black.opacity(0.08), radius: isSelected ? 8 : 4, y: isSelected ? 4 : 2)
         }
         .buttonStyle(.plain)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelected)
