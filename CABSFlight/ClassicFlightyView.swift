@@ -36,7 +36,7 @@ struct ClassicFlightyView: View {
                         )
                 }
                 
-                // Layer 2: Stop annotations
+                // Layer 2: Stop annotations (drawn BELOW buses)
                 ForEach(routeStops) { stop in
                     Annotation("", coordinate: stop.coordinate, anchor: .bottom) {
                         ClassicStationView(
@@ -52,7 +52,7 @@ struct ClassicFlightyView: View {
                     }
                 }
                 
-                // Layer 3: Bus annotations
+                // Layer 3: Bus annotations – LAST = highest Z-index (always on top)
                 ForEach(viewModel.animatedBuses) { bus in
                     Annotation("", coordinate: bus.coordinate) {
                         ClassicBusMarker(
@@ -165,7 +165,7 @@ struct ClassicStationView: View {
     let routeColor: Color
     let isSelected: Bool
     let onTap: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 4) {
             if isSelected {
@@ -175,15 +175,14 @@ struct ClassicStationView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(Capsule().fill(.white).shadow(color: .black.opacity(0.4), radius: 4, y: 2))
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(.opacity)
             }
             Circle()
                 .fill(.white)
-                .frame(width: isSelected ? 16 : 12, height: isSelected ? 16 : 12)
-                .overlay(Circle().stroke(routeColor, lineWidth: isSelected ? 3 : 2.5))
+                .frame(width: 12, height: 12)
+                .overlay(Circle().stroke(routeColor, lineWidth: 2.5))
                 .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
         .onTapGesture { onTap() }
     }
 }
@@ -192,30 +191,17 @@ struct ClassicBusMarker: View {
     let bus: Bus
     let routeColor: Color
     var isSelected: Bool = false
-    
+
     var body: some View {
-        VStack(spacing: 4) {
-            if isSelected {
-                Text(bus.id)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(.white).shadow(color: .black.opacity(0.3), radius: 2, y: 1))
-                    .transition(.scale.combined(with: .opacity))
-            }
-            ZStack {
-                Circle().fill(routeColor).frame(width: 22, height: 22)
-                Circle().strokeBorder(.white, lineWidth: 2).frame(width: 22, height: 22)
-                Image(systemName: "location.north.fill")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
-                    .rotationEffect(.degrees(bus.heading == 0 ? 45 : bus.heading))
-            }
-            .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
+        ZStack {
+            Circle().fill(routeColor).frame(width: 22, height: 22)
+            Circle().strokeBorder(.white, lineWidth: 2).frame(width: 22, height: 22)
+            Image(systemName: "location.north.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
+                .rotationEffect(.degrees(bus.heading == 0 ? 45 : bus.heading))
         }
-        .scaleEffect(isSelected ? 1.4 : 1.0)
-        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isSelected)
+        .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
     }
 }
 
@@ -288,7 +274,8 @@ struct ClassicInfoCard: View {
 
 struct ClassicHeaderOverlay: View {
     @Bindable var viewModel: BusViewModel
-    
+    @State private var showSettings = false
+
     var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
@@ -299,8 +286,8 @@ struct ClassicHeaderOverlay: View {
             }
             Spacer()
             if !viewModel.animatedBuses.isEmpty { ClassicLiveBadge() }
-            Button { viewModel.loadMockData() } label: {
-                Image(systemName: "ladybug.fill")
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape.fill")
                     .font(.system(size: 16))
                     .foregroundColor(.white.opacity(0.5))
                     .padding(10)
@@ -312,6 +299,11 @@ struct ClassicHeaderOverlay: View {
             LinearGradient(colors: [.black, .black.opacity(0.7), .black.opacity(0)], startPoint: .top, endPoint: .bottom)
                 .frame(height: 120).ignoresSafeArea()
         )
+        .sheet(isPresented: $showSettings) {
+            if let prefs = viewModel.userPreferences {
+                SettingsView(viewModel: viewModel, preferences: prefs)
+            }
+        }
     }
 }
 
@@ -345,7 +337,13 @@ struct ClassicBottomOverlay: View {
                 HStack(spacing: 10) {
                     ForEach(viewModel.routes) { route in
                         ClassicRouteChip(route: route, isSelected: viewModel.selectedRoute?.id == route.id) {
-                            viewModel.selectRoute(route)
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                if viewModel.selectedRoute?.id == route.id {
+                                    viewModel.deselectRoute()
+                                } else {
+                                    viewModel.selectRoute(route)
+                                }
+                            }
                         }
                     }
                 }.padding(.horizontal, 20)
@@ -371,6 +369,7 @@ struct ClassicRouteChip: View {
                     .foregroundColor(isSelected ? .white : .white.opacity(0.6))
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
+            .contentShape(Capsule()) // Fill empty space with tappable area
             .background(isSelected ? route.officialColor.opacity(0.25) : Color.white.opacity(0.08))
             .clipShape(Capsule())
             .overlay(Capsule().strokeBorder(isSelected ? route.officialColor : Color.white.opacity(0.15), lineWidth: 2))

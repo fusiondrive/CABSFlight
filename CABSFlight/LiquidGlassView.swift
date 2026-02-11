@@ -37,7 +37,7 @@ struct LiquidGlassView: View {
                         )
                 }
                 
-                // Layer 2: Stop annotations
+                // Layer 2: Stop annotations (drawn BELOW buses)
                 ForEach(routeStops) { stop in
                     Annotation("", coordinate: stop.coordinate, anchor: .bottom) {
                         LiquidStationView(
@@ -53,7 +53,7 @@ struct LiquidGlassView: View {
                     }
                 }
                 
-                // Layer 3: Bus annotations with glossy effect
+                // Layer 3: Bus annotations – LAST = highest Z-index (always on top)
                 ForEach(viewModel.animatedBuses) { bus in
                     Annotation("", coordinate: bus.coordinate) {
                         LiquidBusMarker(
@@ -64,12 +64,10 @@ struct LiquidGlassView: View {
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                if viewModel.selectedBus?.id == bus.id {
-                                    viewModel.clearBusSelection()
-                                } else {
-                                    viewModel.selectBus(bus)
-                                }
+                            if viewModel.selectedBus?.id == bus.id {
+                                viewModel.clearBusSelection()
+                            } else {
+                                viewModel.selectBus(bus)
                             }
                         }
                     }
@@ -177,7 +175,7 @@ struct LiquidStationView: View {
     let routeColor: Color
     let isSelected: Bool
     let onTap: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 4) {
             if isSelected {
@@ -189,15 +187,15 @@ struct LiquidStationView: View {
                     .background(.ultraThinMaterial, in: Capsule())
                     .overlay(Capsule().stroke(.white.opacity(0.3), lineWidth: 1))
                     .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
-                    .transition(.scale.combined(with: .opacity))
+                    .transition(.opacity)
             }
             ZStack {
                 Circle()
                     .fill(.white)
-                    .frame(width: isSelected ? 16 : 12, height: isSelected ? 16 : 12)
+                    .frame(width: 12, height: 12)
                 Circle()
-                    .stroke(routeColor, lineWidth: isSelected ? 3 : 2.5)
-                    .frame(width: isSelected ? 16 : 12, height: isSelected ? 16 : 12)
+                    .stroke(routeColor, lineWidth: 2.5)
+                    .frame(width: 12, height: 12)
                 // Glossy highlight
                 Circle()
                     .fill(
@@ -207,12 +205,11 @@ struct LiquidStationView: View {
                             endPoint: .bottomTrailing
                         )
                     )
-                    .frame(width: isSelected ? 8 : 6, height: isSelected ? 8 : 6)
+                    .frame(width: 6, height: 6)
                     .offset(x: -2, y: -2)
             }
             .shadow(color: routeColor.opacity(0.4), radius: 4, y: 2)
         }
-        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isSelected)
         .onTapGesture { onTap() }
     }
 }
@@ -222,53 +219,38 @@ struct LiquidBusMarker: View {
     let bus: Bus
     let routeColor: Color
     var isSelected: Bool = false
-    
+
     var body: some View {
-        VStack(spacing: 4) {
-            if isSelected {
-                Text(bus.id)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.primary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 3)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().stroke(.white.opacity(0.4), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.2), radius: 3, y: 1)
-                    .transition(.scale.combined(with: .opacity))
-            }
-            ZStack {
-                // Base circle with route color
-                Circle()
-                    .fill(routeColor)
-                    .frame(width: 22, height: 22)
-                
-                // Glossy overlay
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.white.opacity(0.5), .clear],
-                            startPoint: .topLeading,
-                            endPoint: .center
-                        )
+        ZStack {
+            // Base circle with route color
+            Circle()
+                .fill(routeColor)
+                .frame(width: 22, height: 22)
+
+            // Glossy overlay
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [.white.opacity(0.5), .clear],
+                        startPoint: .topLeading,
+                        endPoint: .center
                     )
-                    .frame(width: 22, height: 22)
-                
-                // White border with glow
-                Circle()
-                    .strokeBorder(.white, lineWidth: 2)
-                    .frame(width: 22, height: 22)
-                
-                // Navigation arrow
-                Image(systemName: "location.north.fill")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white)
-                    .rotationEffect(.degrees(bus.heading == 0 ? 45 : bus.heading))
-                    .shadow(color: .black.opacity(0.3), radius: 1, y: 1)
-            }
-            .shadow(color: routeColor.opacity(0.5), radius: 6, y: 3)
+                )
+                .frame(width: 22, height: 22)
+
+            // White border with glow
+            Circle()
+                .strokeBorder(.white, lineWidth: 2)
+                .frame(width: 22, height: 22)
+
+            // Navigation arrow
+            Image(systemName: "location.north.fill")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
+                .rotationEffect(.degrees(bus.heading == 0 ? 45 : bus.heading))
+                .shadow(color: .black.opacity(0.3), radius: 1, y: 1)
         }
-        .scaleEffect(isSelected ? 1.4 : 1.0)
-        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: isSelected)
+        .shadow(color: routeColor.opacity(0.5), radius: 6, y: 3)
     }
 }
 
@@ -378,7 +360,8 @@ struct LiquidInfoCard: View {
 @available(iOS 26, *)
 struct LiquidHeaderOverlay: View {
     @Bindable var viewModel: BusViewModel
-    
+    @State private var showSettings = false
+
     var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
@@ -389,8 +372,8 @@ struct LiquidHeaderOverlay: View {
             }
             Spacer()
             if !viewModel.animatedBuses.isEmpty { LiquidLiveBadge() }
-            Button { viewModel.loadMockData() } label: {
-                Image(systemName: "ladybug.fill")
+            Button { showSettings = true } label: {
+                Image(systemName: "gearshape.fill")
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
                     .padding(10)
@@ -408,6 +391,11 @@ struct LiquidHeaderOverlay: View {
                 .frame(height: 120)
                 .ignoresSafeArea()
         )
+        .sheet(isPresented: $showSettings) {
+            if let prefs = viewModel.userPreferences {
+                SettingsView(viewModel: viewModel, preferences: prefs)
+            }
+        }
     }
 }
 
@@ -444,7 +432,13 @@ struct LiquidBottomOverlay: View {
                 HStack(spacing: 10) {
                     ForEach(viewModel.routes) { route in
                         LiquidRouteChip(route: route, isSelected: viewModel.selectedRoute?.id == route.id) {
-                            viewModel.selectRoute(route)
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                if viewModel.selectedRoute?.id == route.id {
+                                    viewModel.deselectRoute()
+                                } else {
+                                    viewModel.selectRoute(route)
+                                }
+                            }
                         }
                     }
                 }
@@ -471,6 +465,7 @@ struct LiquidRouteChip: View {
                     .foregroundColor(isSelected ? .primary : .secondary)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
+            .contentShape(Capsule()) // Fill empty space with tappable area
             .background(
                 Capsule()
                     .fill(isSelected ? route.officialColor.opacity(0.2) : .clear)
@@ -494,6 +489,7 @@ struct LiquidRouteChip: View {
                         )
                     )
                     .padding(2)
+                    .allowsHitTesting(false) // Don't let overlays steal taps
             )
             .shadow(color: isSelected ? route.officialColor.opacity(0.4) : .clear, radius: 8, y: 4)
         }

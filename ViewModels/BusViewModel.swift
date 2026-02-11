@@ -87,6 +87,14 @@ final class BusViewModel {
         selectedBus = nil
     }
 
+    /// Deselect the current route, clearing all bus/stop data from the map
+    func deselectRoute() {
+        selectedRoute = nil
+        selectedBus = nil
+        buses = []
+        animatedBuses = []
+    }
+
     /// Re-filter `routes` from `allRoutes` using current user preferences.
     /// Call this after preferences change (e.g., after onboarding finishes).
     func applyRouteFilter() {
