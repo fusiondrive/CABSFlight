@@ -26,72 +26,8 @@ struct LiquidGlassView: View {
     var body: some View {
         ZStack {
             // MARK: - Map (Full Screen)
-            Map(position: $cameraPosition) {
-                // Layer 1: Route polylines
-                ForEach(routePolylines) { polyline in
-                    MapPolyline(coordinates: polyline.coordinates)
-                        .stroke(
-                            viewModel.selectedRoute?.officialColor ?? .red,
-                            style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
-                        )
-                }
-                
-                // Layer 2: Stop annotations (drawn BELOW buses)
-                ForEach(routeStops) { stop in
-                    Annotation("", coordinate: stop.coordinate, anchor: .center) {
-                        LiquidStationView(
-                            routeColor: viewModel.selectedRoute?.officialColor ?? .red,
-                            isSelected: viewModel.selectedStop?.id == stop.id
-                        )
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            viewModel.selectStop(stop)
-                        }
-                        .zIndex(1)
-                    }
-                    .zIndex(1)
-                }
-                
-                // Layer 3: Bus annotations – LAST = highest Z-index (always on top)
-                ForEach(viewModel.animatedBuses) { bus in
-                    Annotation("", coordinate: bus.coordinate) {
-                        LiquidBusMarker(
-                            bus: bus,
-                            routeColor: viewModel.selectedRoute?.officialColor ?? .red
-                        )
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if viewModel.selectedVehicle?.id == bus.id {
-                                viewModel.selectedVehicle = nil
-                            } else {
-                                viewModel.selectBus(bus)
-                            }
-                        }
-                        .zIndex(100)
-                    }
-                    .zIndex(100)
-                }
-            }
-            .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
-            .mapControlVisibility(.hidden)
-            .safeAreaPadding(.bottom, 100) // Push Apple Maps logo above buttons
-            .ignoresSafeArea() // Map fills entire screen
-            .onTapGesture {
-                viewModel.selectedStop = nil
-                viewModel.selectedVehicle = nil
-            }
-            .onChange(of: viewModel.selectedRoute?.id) { _, _ in
-                if let route = viewModel.selectedRoute {
-                    viewModel.selectedStop = nil
-                    viewModel.selectedVehicle = nil
-                    let region = calculateBoundingRegion(for: route)
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        cameraPosition = .region(region)
-                    }
-                }
-            }
+            // Extracted to separate struct to reduce compiler complexity
+            LiquidMapLayer(viewModel: viewModel, cameraPosition: $cameraPosition)
             
             // MARK: - Header Overlay (Top)
             VStack {
@@ -136,37 +72,134 @@ struct LiquidGlassView: View {
             cameraPosition = .region(region)
         }
     }
-    
+
+    private var shouldShowInfoCard: Bool {
+        viewModel.selectedRoute != nil
+    }
+}
+
+// MARK: - Liquid Map Layer
+
+@available(iOS 26, *)
+struct LiquidMapLayer: View {
+    @Bindable var viewModel: BusViewModel
+    @Binding var cameraPosition: MapCameraPosition
+
+    var body: some View {
+        Map(position: $cameraPosition) {
+            polylineLayer
+            stopLayer
+            busLayer
+        }
+        .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
+        .mapControlVisibility(.hidden)
+        .safeAreaPadding(.bottom, 100) // Push Apple Maps logo above buttons
+        .ignoresSafeArea() // Map fills entire screen
+        .onTapGesture {
+            viewModel.selectedStop = nil
+            viewModel.selectedVehicle = nil
+        }
+        .onChange(of: viewModel.selectedRoute?.id) { _, _ in
+            if let route = viewModel.selectedRoute {
+                viewModel.selectedStop = nil
+                viewModel.selectedVehicle = nil
+                let region = calculateBoundingRegion(for: route)
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    cameraPosition = .region(region)
+                }
+            }
+        }
+    }
+
+    @MapContentBuilder
+    private var polylineLayer: some MapContent {
+        ForEach(routePolylines) { polyline in
+            MapPolyline(coordinates: polyline.coordinates)
+                .stroke(
+                    viewModel.selectedRoute?.officialColor ?? .red,
+                    style: StrokeStyle(lineWidth: 6, lineCap: .round, lineJoin: .round)
+                )
+        }
+    }
+
+    @MapContentBuilder
+    private var stopLayer: some MapContent {
+        ForEach(routeStops) { stop in
+            Annotation("", coordinate: stop.coordinate, anchor: .center) {
+                LiquidStationView(
+                    routeColor: viewModel.selectedRoute?.officialColor ?? .red,
+                    isSelected: viewModel.selectedStop?.id == stop.id
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    viewModel.selectStop(stop)
+                }
+                .zIndex(1)
+            }
+        }
+    }
+
+    @MapContentBuilder
+    private var busLayer: some MapContent {
+        ForEach(viewModel.animatedBuses) { bus in
+            Annotation("", coordinate: bus.coordinate) {
+                LiquidBusMarker(
+                    bus: bus,
+                    routeColor: viewModel.selectedRoute?.officialColor ?? .red
+                )
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if viewModel.selectedVehicle?.id == bus.id {
+                        viewModel.selectedVehicle = nil
+                    } else {
+                        viewModel.selectBus(bus)
+                    }
+                }
+                .zIndex(100)
+            }
+        }
+    }
+
     private var routePolylines: [IdentifiablePolyline] {
         guard let route = viewModel.selectedRoute else { return [] }
         return route.patterns.enumerated().map { index, pattern in
             IdentifiablePolyline(id: "\(route.id)-\(index)", coordinates: PolylineDecoder.decode(pattern.encodedPolyline))
         }
     }
-    
+
     private var routeStops: [Stop] {
         viewModel.selectedRoute?.stops ?? []
     }
 
-    private var shouldShowInfoCard: Bool {
-        viewModel.selectedRoute != nil
-    }
-    
     private func calculateBoundingRegion(for route: Route) -> MKCoordinateRegion {
         var coords: [CLLocationCoordinate2D] = []
         for pattern in route.patterns {
             coords.append(contentsOf: PolylineDecoder.decode(pattern.encodedPolyline))
         }
         coords.append(contentsOf: route.stops.map { $0.coordinate })
-        
+
         guard !coords.isEmpty else {
-            return MKCoordinateRegion(center: BusViewModel.osuCenter, span: MKCoordinateSpan(latitudeDelta: BusViewModel.defaultSpan, longitudeDelta: BusViewModel.defaultSpan))
+            return MKCoordinateRegion(
+                center: BusViewModel.osuCenter,
+                span: MKCoordinateSpan(
+                    latitudeDelta: BusViewModel.defaultSpan,
+                    longitudeDelta: BusViewModel.defaultSpan
+                )
+            )
         }
-        
+
         let lats = coords.map { $0.latitude }
         let lngs = coords.map { $0.longitude }
-        let center = CLLocationCoordinate2D(latitude: (lats.min()! + lats.max()!) / 2, longitude: (lngs.min()! + lngs.max()!) / 2)
-        let span = MKCoordinateSpan(latitudeDelta: max((lats.max()! - lats.min()!) * 1.4, 0.005), longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.4, 0.005))
+        let center = CLLocationCoordinate2D(
+            latitude: (lats.min()! + lats.max()!) / 2,
+            longitude: (lngs.min()! + lngs.max()!) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: max((lats.max()! - lats.min()!) * 1.4, 0.005),
+            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.4, 0.005)
+        )
         return MKCoordinateRegion(center: center, span: span)
     }
 }
