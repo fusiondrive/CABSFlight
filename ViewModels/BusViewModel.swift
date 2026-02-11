@@ -22,7 +22,13 @@ final class BusViewModel {
     var routes: [Route] = []
 
     var selectedRoute: Route?
+    var selectedStop: Stop?
     var selectedBus: Bus?
+    var selectedVehicle: Bus? {
+        get { selectedBus }
+        set { selectedBus = newValue }
+    }
+    var vehicles: [Bus] { buses.isEmpty ? animatedBuses : buses }
     var buses: [Bus] = []
     var animatedBuses: [Bus] = []
     var isLoading = false
@@ -68,7 +74,8 @@ final class BusViewModel {
     /// Select a route and fetch its buses and route details
     func selectRoute(_ route: Route) {
         selectedRoute = route
-        selectedBus = nil
+        selectedStop = nil
+        selectedVehicle = nil
         buses = []
         animatedBuses = []
         Task {
@@ -79,18 +86,26 @@ final class BusViewModel {
 
     /// Select a specific bus to show in the info card
     func selectBus(_ bus: Bus) {
-        selectedBus = bus
+        selectedStop = nil
+        selectedVehicle = bus
+    }
+
+    /// Select a specific stop and clear vehicle focus
+    func selectStop(_ stop: Stop) {
+        selectedStop = stop
+        selectedVehicle = nil
     }
 
     /// Clear bus selection
     func clearBusSelection() {
-        selectedBus = nil
+        selectedVehicle = nil
     }
 
     /// Deselect the current route, clearing all bus/stop data from the map
     func deselectRoute() {
         selectedRoute = nil
-        selectedBus = nil
+        selectedStop = nil
+        selectedVehicle = nil
         buses = []
         animatedBuses = []
     }
@@ -129,6 +144,7 @@ final class BusViewModel {
                 destination: "NORTH CAMPUS",
                 delayed: false,
                 patternId: "314",
+                nextStopID: nil,
                 distance: 1500,
                 lastUpdated: Date()
             ),
@@ -142,6 +158,7 @@ final class BusViewModel {
                 destination: "SOUTH CAMPUS",
                 delayed: false,
                 patternId: "429",
+                nextStopID: nil,
                 distance: 2800,
                 lastUpdated: Date()
             ),
@@ -155,6 +172,7 @@ final class BusViewModel {
                 destination: "WEST CAMPUS",
                 delayed: true,
                 patternId: "314",
+                nextStopID: nil,
                 distance: 4200,
                 lastUpdated: Date()
             )

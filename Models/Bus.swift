@@ -19,6 +19,7 @@ struct Bus: Identifiable, Codable, Equatable {
     let destination: String?
     let delayed: Bool
     let patternId: String?
+    let nextStopID: String?
     let distance: Int?
     let lastUpdated: Date?
     
@@ -43,6 +44,7 @@ struct Bus: Identifiable, Codable, Equatable {
             destination: target.destination,
             delayed: target.delayed,
             patternId: target.patternId,
+            nextStopID: target.nextStopID,
             distance: target.distance,
             lastUpdated: target.lastUpdated
         )

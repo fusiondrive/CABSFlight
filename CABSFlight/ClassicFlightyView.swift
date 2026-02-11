@@ -11,7 +11,6 @@ import MapKit
 /// Classic Flighty-style dark mode view (stable for older iOS versions)
 struct ClassicFlightyView: View {
     @Environment(BusViewModel.self) private var viewModel
-    @State private var selectedStopID: String?
     
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
@@ -38,18 +37,19 @@ struct ClassicFlightyView: View {
                 
                 // Layer 2: Stop annotations (drawn BELOW buses)
                 ForEach(routeStops) { stop in
-                    Annotation("", coordinate: stop.coordinate, anchor: .bottom) {
+                    Annotation("", coordinate: stop.coordinate, anchor: .center) {
                         ClassicStationView(
-                            stop: stop,
                             routeColor: viewModel.selectedRoute?.officialColor ?? .red,
-                            isSelected: selectedStopID == stop.id,
-                            onTap: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    selectedStopID = selectedStopID == stop.id ? nil : stop.id
-                                }
-                            }
+                            isSelected: viewModel.selectedStop?.id == stop.id
                         )
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            viewModel.selectStop(stop)
+                        }
+                        .zIndex(1)
                     }
+                    .zIndex(1)
                 }
                 
                 // Layer 3: Bus annotations – LAST = highest Z-index (always on top)
@@ -57,35 +57,33 @@ struct ClassicFlightyView: View {
                     Annotation("", coordinate: bus.coordinate) {
                         ClassicBusMarker(
                             bus: bus,
-                            routeColor: viewModel.selectedRoute?.officialColor ?? .red,
-                            isSelected: viewModel.selectedBus?.id == bus.id
+                            routeColor: viewModel.selectedRoute?.officialColor ?? .red
                         )
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                if viewModel.selectedBus?.id == bus.id {
-                                    viewModel.clearBusSelection()
-                                } else {
-                                    viewModel.selectBus(bus)
-                                }
+                            if viewModel.selectedVehicle?.id == bus.id {
+                                viewModel.selectedVehicle = nil
+                            } else {
+                                viewModel.selectBus(bus)
                             }
                         }
+                        .zIndex(100)
                     }
+                    .zIndex(100)
                 }
             }
             .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
             .mapControlVisibility(.hidden)
             .ignoresSafeArea()
             .onTapGesture {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                    viewModel.clearBusSelection()
-                    selectedStopID = nil
-                }
+                viewModel.selectedStop = nil
+                viewModel.selectedVehicle = nil
             }
             .onChange(of: viewModel.selectedRoute?.id) { _, _ in
                 if let route = viewModel.selectedRoute {
-                    selectedStopID = nil
+                    viewModel.selectedStop = nil
+                    viewModel.selectedVehicle = nil
                     let region = calculateBoundingRegion(for: route)
                     withAnimation(.easeInOut(duration: 0.5)) {
                         cameraPosition = .region(region)
@@ -101,7 +99,7 @@ struct ClassicFlightyView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !viewModel.animatedBuses.isEmpty {
+            if shouldShowInfoCard {
                 ClassicInfoCard(viewModel: viewModel, onFocusBus: zoomToBus)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
@@ -138,6 +136,10 @@ struct ClassicFlightyView: View {
     private var routeStops: [Stop] {
         viewModel.selectedRoute?.stops ?? []
     }
+
+    private var shouldShowInfoCard: Bool {
+        viewModel.selectedRoute != nil
+    }
     
     private func calculateBoundingRegion(for route: Route) -> MKCoordinateRegion {
         var coords: [CLLocationCoordinate2D] = []
@@ -161,36 +163,23 @@ struct ClassicFlightyView: View {
 // MARK: - Classic Components
 
 struct ClassicStationView: View {
-    let stop: Stop
     let routeColor: Color
     let isSelected: Bool
-    let onTap: () -> Void
 
     var body: some View {
-        VStack(spacing: 4) {
-            if isSelected {
-                Text(stop.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.black)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Capsule().fill(.white).shadow(color: .black.opacity(0.4), radius: 4, y: 2))
-                    .transition(.opacity)
-            }
-            Circle()
-                .fill(.white)
-                .frame(width: 12, height: 12)
-                .overlay(Circle().stroke(routeColor, lineWidth: 2.5))
-                .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
-        }
-        .onTapGesture { onTap() }
+        Circle()
+            .fill(.white)
+            .frame(width: 12, height: 12)
+            .overlay(Circle().stroke(routeColor, lineWidth: 2.5))
+            .scaleEffect(isSelected ? 1.14 : 1.0)
+            .animation(.easeOut(duration: 0.2), value: isSelected)
+            .shadow(color: .black.opacity(0.3), radius: 2, y: 1)
     }
 }
 
 struct ClassicBusMarker: View {
     let bus: Bus
     let routeColor: Color
-    var isSelected: Bool = false
 
     var body: some View {
         ZStack {
@@ -209,25 +198,38 @@ struct ClassicInfoCard: View {
     @Bindable var viewModel: BusViewModel
     var onFocusBus: ((Bus) -> Void)?
     
-    private var displayBus: Bus? { viewModel.selectedBus ?? viewModel.animatedBuses.first }
+    private var selectedVehicle: Bus? { viewModel.selectedVehicle }
+    private var selectedStop: Stop? { viewModel.selectedStop }
+    private var selectedRoute: Route? { viewModel.selectedRoute }
+    private var approachingVehicles: [Bus] {
+        guard let selectedStop else { return [] }
+        return viewModel.vehicles.filter { $0.nextStopID == selectedStop.id }
+    }
+    private var statusTitle: String {
+        if selectedVehicle != nil { return "VEHICLE" }
+        if selectedStop != nil { return "STATION" }
+        return "ROUTE"
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(viewModel.selectedRoute?.name ?? "BUS ROUTE")
+                Text(statusTitle)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.white.opacity(0.5))
                     .tracking(1)
                 Spacer()
-                HStack(spacing: 4) {
-                    Circle().fill(.green).frame(width: 6, height: 6)
-                    Text("LIVE").font(.system(size: 10, weight: .bold)).foregroundColor(.green)
+                if !viewModel.vehicles.isEmpty {
+                    HStack(spacing: 4) {
+                        Circle().fill(.green).frame(width: 6, height: 6)
+                        Text("LIVE").font(.system(size: 10, weight: .bold)).foregroundColor(.green)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Capsule().fill(Color.green.opacity(0.15)))
                 }
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(Capsule().fill(Color.green.opacity(0.15)))
             }
             
-            if let bus = displayBus {
+            if let bus = selectedVehicle {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.right.circle.fill")
@@ -241,6 +243,12 @@ struct ClassicInfoCard: View {
                         Label("\(bus.speed) mph", systemImage: "speedometer")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
+                        Label(
+                            "Location \(bus.latitude, specifier: "%.4f"), \(bus.longitude, specifier: "%.4f")",
+                            systemImage: "location"
+                        )
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
                         if bus.delayed {
                             Label("Delayed", systemImage: "exclamationmark.triangle.fill")
                                 .font(.system(size: 13, weight: .medium))
@@ -258,6 +266,38 @@ struct ClassicInfoCard: View {
                         }
                         .buttonStyle(.plain)
                     }
+                }
+            } else if let stop = selectedStop {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(stop.name)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("Approaching Buses")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.6))
+                    if approachingVehicles.isEmpty {
+                        Text("No buses approaching.")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                    } else {
+                        ForEach(approachingVehicles.prefix(5)) { bus in
+                            Text("Bus \(bus.id) - Arriving")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+            } else if let route = selectedRoute {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(route.name)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.white)
+                    Text("\(viewModel.vehicles.count) buses currently active")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
+                    Text("Tap a bus or station for details.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.white.opacity(0.6))
                 }
             }
         }

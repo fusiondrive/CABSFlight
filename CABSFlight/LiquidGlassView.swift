@@ -12,7 +12,6 @@ import MapKit
 @available(iOS 26, *)
 struct LiquidGlassView: View {
     @Environment(BusViewModel.self) private var viewModel
-    @State private var selectedStopID: String?
     
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
@@ -39,18 +38,19 @@ struct LiquidGlassView: View {
                 
                 // Layer 2: Stop annotations (drawn BELOW buses)
                 ForEach(routeStops) { stop in
-                    Annotation("", coordinate: stop.coordinate, anchor: .bottom) {
+                    Annotation("", coordinate: stop.coordinate, anchor: .center) {
                         LiquidStationView(
-                            stop: stop,
                             routeColor: viewModel.selectedRoute?.officialColor ?? .red,
-                            isSelected: selectedStopID == stop.id,
-                            onTap: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                                    selectedStopID = selectedStopID == stop.id ? nil : stop.id
-                                }
-                            }
+                            isSelected: viewModel.selectedStop?.id == stop.id
                         )
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            viewModel.selectStop(stop)
+                        }
+                        .zIndex(1)
                     }
+                    .zIndex(1)
                 }
                 
                 // Layer 3: Bus annotations – LAST = highest Z-index (always on top)
@@ -58,19 +58,20 @@ struct LiquidGlassView: View {
                     Annotation("", coordinate: bus.coordinate) {
                         LiquidBusMarker(
                             bus: bus,
-                            routeColor: viewModel.selectedRoute?.officialColor ?? .red,
-                            isSelected: viewModel.selectedBus?.id == bus.id
+                            routeColor: viewModel.selectedRoute?.officialColor ?? .red
                         )
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if viewModel.selectedBus?.id == bus.id {
-                                viewModel.clearBusSelection()
+                            if viewModel.selectedVehicle?.id == bus.id {
+                                viewModel.selectedVehicle = nil
                             } else {
                                 viewModel.selectBus(bus)
                             }
                         }
+                        .zIndex(100)
                     }
+                    .zIndex(100)
                 }
             }
             .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
@@ -78,14 +79,13 @@ struct LiquidGlassView: View {
             .safeAreaPadding(.bottom, 100) // Push Apple Maps logo above buttons
             .ignoresSafeArea() // Map fills entire screen
             .onTapGesture {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.6)) {
-                    viewModel.clearBusSelection()
-                    selectedStopID = nil
-                }
+                viewModel.selectedStop = nil
+                viewModel.selectedVehicle = nil
             }
             .onChange(of: viewModel.selectedRoute?.id) { _, _ in
                 if let route = viewModel.selectedRoute {
-                    selectedStopID = nil
+                    viewModel.selectedStop = nil
+                    viewModel.selectedVehicle = nil
                     let region = calculateBoundingRegion(for: route)
                     withAnimation(.easeInOut(duration: 0.5)) {
                         cameraPosition = .region(region)
@@ -108,14 +108,14 @@ struct LiquidGlassView: View {
                     .zIndex(10)
                 
                 // Info card (floating at bottom)
-                if !viewModel.animatedBuses.isEmpty {
+                if shouldShowInfoCard {
                     LiquidInfoCard(viewModel: viewModel, onFocusBus: zoomToBus)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
             // Dynamic bottom padding: lift buttons when no card, tight when card shown
-            .padding(.bottom, viewModel.animatedBuses.isEmpty ? 50 : 8)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: viewModel.animatedBuses.isEmpty)
+            .padding(.bottom, shouldShowInfoCard ? 8 : 50)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: shouldShowInfoCard)
             .ignoresSafeArea(.container, edges: .bottom) // Measure from physical screen edge
         }
         .onAppear { viewModel.startTracking() }
@@ -147,6 +147,10 @@ struct LiquidGlassView: View {
     private var routeStops: [Stop] {
         viewModel.selectedRoute?.stops ?? []
     }
+
+    private var shouldShowInfoCard: Bool {
+        viewModel.selectedRoute != nil
+    }
     
     private func calculateBoundingRegion(for route: Route) -> MKCoordinateRegion {
         var coords: [CLLocationCoordinate2D] = []
@@ -171,46 +175,32 @@ struct LiquidGlassView: View {
 
 @available(iOS 26, *)
 struct LiquidStationView: View {
-    let stop: Stop
     let routeColor: Color
     let isSelected: Bool
-    let onTap: () -> Void
 
     var body: some View {
-        VStack(spacing: 4) {
-            if isSelected {
-                Text(stop.name)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.primary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .overlay(Capsule().stroke(.white.opacity(0.3), lineWidth: 1))
-                    .shadow(color: .black.opacity(0.3), radius: 6, y: 3)
-                    .transition(.opacity)
-            }
-            ZStack {
-                Circle()
-                    .fill(.white)
-                    .frame(width: 12, height: 12)
-                Circle()
-                    .stroke(routeColor, lineWidth: 2.5)
-                    .frame(width: 12, height: 12)
-                // Glossy highlight
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [.white.opacity(0.6), .clear],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
+        ZStack {
+            Circle()
+                .fill(.white)
+                .frame(width: 12, height: 12)
+            Circle()
+                .stroke(routeColor, lineWidth: 2.5)
+                .frame(width: 12, height: 12)
+            // Glossy highlight
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [.white.opacity(0.6), .clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
                     )
-                    .frame(width: 6, height: 6)
-                    .offset(x: -2, y: -2)
-            }
-            .shadow(color: routeColor.opacity(0.4), radius: 4, y: 2)
+                )
+                .frame(width: 6, height: 6)
+                .offset(x: -2, y: -2)
         }
-        .onTapGesture { onTap() }
+        .scaleEffect(isSelected ? 1.14 : 1.0)
+        .animation(.easeOut(duration: 0.2), value: isSelected)
+        .shadow(color: routeColor.opacity(0.4), radius: 4, y: 2)
     }
 }
 
@@ -218,7 +208,6 @@ struct LiquidStationView: View {
 struct LiquidBusMarker: View {
     let bus: Bus
     let routeColor: Color
-    var isSelected: Bool = false
 
     var body: some View {
         ZStack {
@@ -259,7 +248,18 @@ struct LiquidInfoCard: View {
     @Bindable var viewModel: BusViewModel
     var onFocusBus: ((Bus) -> Void)?
     
-    private var displayBus: Bus? { viewModel.selectedBus ?? viewModel.animatedBuses.first }
+    private var selectedVehicle: Bus? { viewModel.selectedVehicle }
+    private var selectedStop: Stop? { viewModel.selectedStop }
+    private var selectedRoute: Route? { viewModel.selectedRoute }
+    private var approachingVehicles: [Bus] {
+        guard let selectedStop else { return [] }
+        return viewModel.vehicles.filter { $0.nextStopID == selectedStop.id }
+    }
+    private var statusTitle: String {
+        if selectedVehicle != nil { return "VEHICLE" }
+        if selectedStop != nil { return "STATION" }
+        return "ROUTE"
+    }
     
     /// Dynamic corner radius based on device
     private var cornerRadius: CGFloat { ScreenCornerRadius.current }
@@ -271,21 +271,23 @@ struct LiquidInfoCard: View {
         VStack(alignment: .leading, spacing: 8) {
             // Header row
             HStack {
-                Text(viewModel.selectedRoute?.name ?? "BUS ROUTE")
+                Text(statusTitle)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.secondary)
                     .tracking(1)
                 Spacer()
-                HStack(spacing: 4) {
-                    Circle().fill(.green).frame(width: 6, height: 6)
-                    Text("LIVE").font(.system(size: 10, weight: .bold)).foregroundColor(.green)
+                if !viewModel.vehicles.isEmpty {
+                    HStack(spacing: 4) {
+                        Circle().fill(.green).frame(width: 6, height: 6)
+                        Text("LIVE").font(.system(size: 10, weight: .bold)).foregroundColor(.green)
+                    }
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(.green.opacity(0.15), in: Capsule())
                 }
-                .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(.green.opacity(0.15), in: Capsule())
             }
             
-            // Bus info
-            if let bus = displayBus {
+            if let bus = selectedVehicle {
+                // Vehicle mode
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.right.circle.fill")
@@ -299,6 +301,12 @@ struct LiquidInfoCard: View {
                         Label("\(bus.speed) mph", systemImage: "speedometer")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.secondary)
+                        Label(
+                            "Location \(bus.latitude, specifier: "%.4f"), \(bus.longitude, specifier: "%.4f")",
+                            systemImage: "location"
+                        )
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
                         if bus.delayed {
                             Label("Delayed", systemImage: "exclamationmark.triangle.fill")
                                 .font(.system(size: 13, weight: .medium))
@@ -317,6 +325,40 @@ struct LiquidInfoCard: View {
                         }
                         .buttonStyle(.plain)
                     }
+                }
+            } else if let stop = selectedStop {
+                // Station mode
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(stop.name)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.primary)
+                    Text("Approaching Buses")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    if approachingVehicles.isEmpty {
+                        Text("No buses approaching.")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(approachingVehicles.prefix(5)) { bus in
+                            Text("Bus \(bus.id) - Arriving")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.primary)
+                        }
+                    }
+                }
+            } else if let route = selectedRoute {
+                // Route mode
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(route.name)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(.primary)
+                    Text("\(viewModel.vehicles.count) buses currently active")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(.secondary)
+                    Text("Tap a bus or station for details.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.secondary)
                 }
             }
         }

@@ -77,6 +77,8 @@ struct CABSVehiclesResponse: Codable {
         let destination: String?
         let distance: Int?
         let patternId: String?
+        let nextStopId: String?
+        let nextStopID: String?
         let routeCode: String?
     }
 }

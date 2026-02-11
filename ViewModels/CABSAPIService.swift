@@ -103,6 +103,7 @@ actor CABSAPIService {
                 destination: vehicle.destination,
                 delayed: vehicle.delayed ?? false,
                 patternId: vehicle.patternId,
+                nextStopID: vehicle.nextStopID ?? vehicle.nextStopId,
                 distance: vehicle.distance,
                 lastUpdated: lastUpdated
             )
