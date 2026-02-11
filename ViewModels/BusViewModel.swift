@@ -296,6 +296,51 @@ final class BusViewModel {
             return targetBus
         }
     }
+
+    // MARK: - Predictions
+
+    /// Returns nearby buses from all routes that serve the given stop, sorted by distance.
+    func predictions(for stop: Stop) -> [ArrivalPrediction] {
+        // Step 1: Find which routes serve this stop
+        let servingRoutes = allRoutes.filter { route in
+            route.stops.contains { $0.id == stop.id }
+        }
+
+        // Step 2: Find vehicles heading toward this stop
+        var predictions: [ArrivalPrediction] = []
+
+        for route in servingRoutes {
+            let routeVehicles = vehicles.filter { $0.routeCode == route.id }
+
+            for bus in routeVehicles {
+                let distance = Self.distance(from: bus.coordinate, to: stop.coordinate)
+
+                // Only show buses within ~1 mile (1600 meters)
+                if distance < 1600 {
+                    predictions.append(ArrivalPrediction(bus: bus, route: route, distance: distance))
+                }
+            }
+        }
+
+        // Step 3: Sort by nearest distance
+        return predictions.sorted { $0.distance < $1.distance }
+    }
+
+    /// Haversine distance between two coordinates, in meters.
+    private static func distance(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
+        let loc1 = CLLocation(latitude: a.latitude, longitude: a.longitude)
+        let loc2 = CLLocation(latitude: b.latitude, longitude: b.longitude)
+        return loc1.distance(from: loc2)
+    }
+}
+
+// MARK: - Arrival Prediction
+
+struct ArrivalPrediction: Identifiable {
+    var id: String { "\(bus.id)-\(route.id)" }
+    let bus: Bus
+    let route: Route
+    let distance: Double // meters
 }
 
 // MARK: - Map Constants

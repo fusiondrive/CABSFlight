@@ -360,7 +360,8 @@ struct LiquidInfoCard: View {
                     }
                 }
             } else if let stop = selectedStop {
-                // Station mode
+                // Station mode with multi-route predictions
+                let preds = viewModel.predictions(for: stop)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(stop.name)
                         .font(.system(size: 22, weight: .bold))
@@ -368,15 +369,34 @@ struct LiquidInfoCard: View {
                     Text("Approaching Buses")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.secondary)
-                    if approachingVehicles.isEmpty {
+                    if preds.isEmpty {
                         Text("No buses approaching.")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.secondary)
                     } else {
-                        ForEach(approachingVehicles.prefix(5)) { bus in
-                            Text("Bus \(bus.id) - Arriving")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.primary)
+                        ForEach(preds.prefix(5)) { pred in
+                            HStack(spacing: 8) {
+                                // Route badge capsule
+                                Text(pred.route.id)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(pred.route.officialColor, in: Capsule())
+
+                                // Bus identifier
+                                Text("Bus \(pred.bus.id)")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.primary)
+
+                                Spacer()
+
+                                // ETA estimate (~1 min per 800m)
+                                let eta = max(1, Int(pred.distance / 800))
+                                Text("\(eta) min away")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.secondary)
+                            }
                         }
                     }
                 }
