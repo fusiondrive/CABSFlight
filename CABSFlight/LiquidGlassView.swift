@@ -442,7 +442,7 @@ struct LiquidHeaderOverlay: View {
     @State private var showSettings = false
 
     var body: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 4) {
                 Text("CABS").font(.system(size: 34, weight: .bold)).foregroundColor(.primary)
                 if let route = viewModel.selectedRoute {
@@ -450,14 +450,18 @@ struct LiquidHeaderOverlay: View {
                 }
             }
             Spacer()
-            if !viewModel.animatedBuses.isEmpty { LiquidLiveBadge() }
-            Button { showSettings = true } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.system(size: 16))
-                    .foregroundColor(.secondary)
-                    .padding(10)
-                    .glassEffect(.regular.interactive(true), in: Circle())
-                    .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+            HStack(spacing: 12) {
+                if !viewModel.animatedBuses.isEmpty {
+                    LiquidLiveBadge()
+                }
+                Button { showSettings = true } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.secondary)
+                        .frame(width: 40, height: 40)
+                        .glassEffect(.regular.interactive(true), in: Circle())
+                        .shadow(color: .black.opacity(0.1), radius: 4, y: 2)
+                }
             }
         }
         .padding(.horizontal, 20).padding(.top, 8)
@@ -485,9 +489,10 @@ struct LiquidLiveBadge: View {
         HStack(spacing: 6) {
             Circle().fill(.green).frame(width: 8, height: 8)
                 .scaleEffect(isPulsing ? 1.3 : 1.0).opacity(isPulsing ? 0.6 : 1.0)
-            Text("LIVE").font(.system(size: 11, weight: .semibold)).foregroundColor(.primary.opacity(0.7))
+            Text("LIVE").font(.system(size: 13, weight: .semibold)).foregroundColor(.primary.opacity(0.8))
         }
-        .padding(.horizontal, 10).padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .frame(height: 40)
         .glassEffect(.regular.interactive(true), in: Capsule())
         .shadow(color: .green.opacity(0.15), radius: 5, y: 2)
         .onAppear { withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) { isPulsing = true } }
