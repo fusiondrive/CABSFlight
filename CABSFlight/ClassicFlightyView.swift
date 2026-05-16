@@ -86,15 +86,11 @@ struct ClassicMapLayer: View {
             viewModel.selectedStop = nil
             viewModel.selectedVehicle = nil
         }
-        .onChange(of: viewModel.selectedRoute?.id) { _, _ in
-            if let route = viewModel.selectedRoute {
-                viewModel.selectedStop = nil
-                viewModel.selectedVehicle = nil
-                let region = calculateBoundingRegion(for: route)
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    cameraPosition = .region(region)
-                }
-            }
+        .onAppear {
+            lockCameraToSelectedRoute(animated: false, clearSelection: false)
+        }
+        .onChange(of: routeCameraKey) { _, _ in
+            lockCameraToSelectedRoute()
         }
     }
 
@@ -158,34 +154,38 @@ struct ClassicMapLayer: View {
         viewModel.selectedRoute?.stops ?? []
     }
 
-    private func calculateBoundingRegion(for route: Route) -> MKCoordinateRegion {
-        var coords: [CLLocationCoordinate2D] = []
-        for pattern in route.patterns {
-            coords.append(contentsOf: PolylineDecoder.decode(pattern.encodedPolyline))
-        }
-        coords.append(contentsOf: route.stops.map { $0.coordinate })
+    private var routeCameraKey: String {
+        guard let route = viewModel.selectedRoute else { return "none" }
+        return [
+            route.id,
+            String(route.stops.count),
+            String(route.patterns.count),
+            route.stops.first?.id ?? "",
+            route.stops.last?.id ?? "",
+            route.patterns.first?.id ?? "",
+            route.patterns.last?.id ?? ""
+        ].joined(separator: "-")
+    }
 
-        guard !coords.isEmpty else {
-            return MKCoordinateRegion(
-                center: BusViewModel.osuCenter,
-                span: MKCoordinateSpan(
-                    latitudeDelta: BusViewModel.defaultSpan,
-                    longitudeDelta: BusViewModel.defaultSpan
-                )
-            )
+    private func lockCameraToSelectedRoute(
+        animated: Bool = true,
+        clearSelection: Bool = true
+    ) {
+        guard let route = viewModel.selectedRoute else { return }
+
+        if clearSelection {
+            viewModel.selectedStop = nil
+            viewModel.selectedVehicle = nil
         }
 
-        let lats = coords.map { $0.latitude }
-        let lngs = coords.map { $0.longitude }
-        let center = CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lngs.min()! + lngs.max()!) / 2
-        )
-        let span = MKCoordinateSpan(
-            latitudeDelta: max((lats.max()! - lats.min()!) * 1.4, 0.005),
-            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.4, 0.005)
-        )
-        return MKCoordinateRegion(center: center, span: span)
+        let mapRect = route.routeLockedMapRect()
+        if animated {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                cameraPosition = .rect(mapRect)
+            }
+        } else {
+            cameraPosition = .rect(mapRect)
+        }
     }
 }
 
@@ -230,10 +230,6 @@ struct ClassicInfoCard: View {
     private var selectedVehicle: Bus? { viewModel.selectedVehicle }
     private var selectedStop: Stop? { viewModel.selectedStop }
     private var selectedRoute: Route? { viewModel.selectedRoute }
-    private var approachingVehicles: [Bus] {
-        guard let selectedStop else { return [] }
-        return viewModel.vehicles.filter { $0.nextStopID == selectedStop.id }
-    }
     private var statusTitle: String {
         if selectedVehicle != nil { return "VEHICLE" }
         if selectedStop != nil { return "STATION" }
@@ -269,7 +265,7 @@ struct ClassicInfoCard: View {
                             .foregroundColor(.white)
                     }
                     HStack(spacing: 12) {
-                        Label("\(bus.speed) mph", systemImage: "speedometer")
+                        Label("\(viewModel.estimatedSpeedMPH(for: bus)) mph", systemImage: "speedometer")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
                         Label(
@@ -297,6 +293,7 @@ struct ClassicInfoCard: View {
                     }
                 }
             } else if let stop = selectedStop {
+                let preds = viewModel.predictions(for: stop)
                 VStack(alignment: .leading, spacing: 6) {
                     Text(stop.name)
                         .font(.system(size: 22, weight: .bold))
@@ -304,15 +301,30 @@ struct ClassicInfoCard: View {
                     Text("Approaching Buses")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.6))
-                    if approachingVehicles.isEmpty {
+                    if preds.isEmpty {
                         Text("No buses approaching.")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.6))
                     } else {
-                        ForEach(approachingVehicles.prefix(5)) { bus in
-                            Text("Bus \(bus.id) - Arriving")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white)
+                        ForEach(preds.prefix(5)) { pred in
+                            HStack(spacing: 8) {
+                                Text(pred.route.id)
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Capsule().fill(pred.route.officialColor))
+
+                                Text("Bus \(pred.bus.id)")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.white)
+
+                                Spacer()
+
+                                Text(pred.timeDisplay)
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(pred.timeDisplay == "Due" ? .green : .white.opacity(0.7))
+                            }
                         }
                     }
                 }

@@ -106,15 +106,11 @@ struct LiquidMapLayer: View {
             viewModel.selectedStop = nil
             viewModel.selectedVehicle = nil
         }
-        .onChange(of: viewModel.selectedRoute?.id) { _, _ in
-            if let route = viewModel.selectedRoute {
-                viewModel.selectedStop = nil
-                viewModel.selectedVehicle = nil
-                let region = calculateBoundingRegion(for: route)
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    cameraPosition = .region(region)
-                }
-            }
+        .onAppear {
+            lockCameraToSelectedRoute(animated: false, clearSelection: false)
+        }
+        .onChange(of: routeCameraKey) { _, _ in
+            lockCameraToSelectedRoute()
         }
     }
 
@@ -180,34 +176,38 @@ struct LiquidMapLayer: View {
         viewModel.selectedRoute?.stops ?? []
     }
 
-    private func calculateBoundingRegion(for route: Route) -> MKCoordinateRegion {
-        var coords: [CLLocationCoordinate2D] = []
-        for pattern in route.patterns {
-            coords.append(contentsOf: PolylineDecoder.decode(pattern.encodedPolyline))
-        }
-        coords.append(contentsOf: route.stops.map { $0.coordinate })
+    private var routeCameraKey: String {
+        guard let route = viewModel.selectedRoute else { return "none" }
+        return [
+            route.id,
+            String(route.stops.count),
+            String(route.patterns.count),
+            route.stops.first?.id ?? "",
+            route.stops.last?.id ?? "",
+            route.patterns.first?.id ?? "",
+            route.patterns.last?.id ?? ""
+        ].joined(separator: "-")
+    }
 
-        guard !coords.isEmpty else {
-            return MKCoordinateRegion(
-                center: BusViewModel.osuCenter,
-                span: MKCoordinateSpan(
-                    latitudeDelta: BusViewModel.defaultSpan,
-                    longitudeDelta: BusViewModel.defaultSpan
-                )
-            )
+    private func lockCameraToSelectedRoute(
+        animated: Bool = true,
+        clearSelection: Bool = true
+    ) {
+        guard let route = viewModel.selectedRoute else { return }
+
+        if clearSelection {
+            viewModel.selectedStop = nil
+            viewModel.selectedVehicle = nil
         }
 
-        let lats = coords.map { $0.latitude }
-        let lngs = coords.map { $0.longitude }
-        let center = CLLocationCoordinate2D(
-            latitude: (lats.min()! + lats.max()!) / 2,
-            longitude: (lngs.min()! + lngs.max()!) / 2
-        )
-        let span = MKCoordinateSpan(
-            latitudeDelta: max((lats.max()! - lats.min()!) * 1.4, 0.005),
-            longitudeDelta: max((lngs.max()! - lngs.min()!) * 1.4, 0.005)
-        )
-        return MKCoordinateRegion(center: center, span: span)
+        let mapRect = route.routeLockedMapRect()
+        if animated {
+            withAnimation(.easeInOut(duration: 0.5)) {
+                cameraPosition = .rect(mapRect)
+            }
+        } else {
+            cameraPosition = .rect(mapRect)
+        }
     }
 }
 
@@ -291,10 +291,6 @@ struct LiquidInfoCard: View {
     private var selectedVehicle: Bus? { viewModel.selectedVehicle }
     private var selectedStop: Stop? { viewModel.selectedStop }
     private var selectedRoute: Route? { viewModel.selectedRoute }
-    private var approachingVehicles: [Bus] {
-        guard let selectedStop else { return [] }
-        return viewModel.vehicles.filter { $0.nextStopID == selectedStop.id }
-    }
     private var statusTitle: String {
         if selectedVehicle != nil { return "VEHICLE" }
         if selectedStop != nil { return "STATION" }
@@ -341,7 +337,7 @@ struct LiquidInfoCard: View {
                                 .foregroundColor(.primary)
                         }
                         HStack(spacing: 12) {
-                            Label("\(bus.speed) mph", systemImage: "speedometer")
+                            Label("\(viewModel.estimatedSpeedMPH(for: bus)) mph", systemImage: "speedometer")
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(.secondary)
                             if bus.delayed {
@@ -398,7 +394,7 @@ struct LiquidInfoCard: View {
                                     // ETA from advanced prediction algorithm
                                     Text(pred.timeDisplay)
                                         .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(pred.timeDisplay == "Arriving" ? .green : .secondary)
+                                        .foregroundColor(pred.timeDisplay == "Due" ? .green : .secondary)
                                 }
                             }
                         }
