@@ -34,6 +34,11 @@ final class BusViewModel {
     var isLoading = false
     var error: String?
 
+    /// When true the production polling loop will discard empty API responses,
+    /// protecting any mock buses loaded via loadMockData() from being wiped.
+    /// Automatically set by loadMockData(); reset by deselectRoute().
+    var mockModeActive: Bool = false
+
     /// Injected user preferences for route visibility filtering
     var userPreferences: UserPreferences?
 
@@ -48,19 +53,21 @@ final class BusViewModel {
     private let animationDuration: Double = 0.8
     private let averageCampusSpeed = 5.5 // meters per second
     private let maxReliableCampusSpeed = 15.0 // meters per second; faster samples are treated as GPS jitter
-    private let roadDistanceMultiplier = 1.35
-    private let activeRouteGeofenceDistance = 300.0
+    private let activeRouteGeofenceDistance = 150.0
     private let averageTimeBetweenStops = 90.0
-    private let stationarySpeedThreshold = 0.5
+    private let stationarySpeedThreshold = 1.5
     private let parkedTimeout: TimeInterval = 180
     private let significantMovementDistance = 15.0
-    private let routeCorridorDistance = 500.0
+    private let routeCorridorDistance = 100.0
     private let depotClusterRadius = 80.0
     private let depotRouteDistanceThreshold = 600.0
     private let headingUpdateDistance = 5.0
     private let stableBearingSpeedThreshold = 2.5
+    private let backwardDistanceDecreaseThreshold = 2.0
     private let passByDistance = 15.0
-    private let passByAngle = 90.0
+    private let passByAngle = 120.0
+    private let shortHopStopLimit = 2
+    private let shortHopMaxETASeconds = 15 * 60.0
     private let maxPredictionsPerRoute = 2
 
     // MARK: - Initialization
@@ -127,6 +134,7 @@ final class BusViewModel {
         buses = []
         animatedBuses = []
         speedTrackers = [:]
+        mockModeActive = false   // re-enable live polling for the next route selection
     }
 
     /// Re-filter `routes` from `allRoutes` using current user preferences.
@@ -202,6 +210,8 @@ final class BusViewModel {
         buses = mockBuses
         animatedBuses = mockBuses
         targetBuses = mockBuses
+        // Protect mock positions from being wiped by the next empty API poll.
+        mockModeActive = true
     }
 
     /// Estimated speed in miles per hour, derived from raw coordinate polling.
@@ -251,18 +261,30 @@ final class BusViewModel {
 
         do {
             let incomingBuses = try await CABSAPIService.shared.fetchVehicles(routeCode: routeCode)
-            let newBuses = spatiallyFilteredVehicles(incomingBuses)
 
-            // If empty and no buses, don't update (allows mock data to persist)
-            if incomingBuses.isEmpty && buses.isEmpty {
-                return
-            }
+            // Mock-mode guard: the mock engine owns all bus state while active.
+            // An empty production response must never overwrite simulated positions.
+            if mockModeActive && incomingBuses.isEmpty { return }
+
+            // Live-mode guard: nothing on server + nothing on map → no-op.
+            if incomingBuses.isEmpty && buses.isEmpty { return }
+
+            let newBuses = spatiallyFilteredVehicles(incomingBuses)
 
             updateSpeedTrackers(with: newBuses)
             targetBuses = newBuses
+            buses = newBuses
             if let selectedVehicle, !newBuses.contains(where: { $0.id == selectedVehicle.id }) {
                 self.selectedVehicle = nil
             }
+
+            if newBuses.isEmpty {
+                animationTask?.cancel()
+                buses = []
+                animatedBuses = []
+                return
+            }
+
             await animateToBuses(newBuses)
 
         } catch {
@@ -343,6 +365,7 @@ final class BusViewModel {
             guard let lastLocation = tracker.lastLocation,
                   let lastUpdateTime = tracker.lastUpdateTime else {
                 tracker.lastLocation = currentLocation
+                tracker.previousLocation = nil
                 tracker.lastSignificantLocation = currentLocation
                 tracker.lastUpdateTime = updateTime
                 tracker.stationarySince = updateTime
@@ -373,6 +396,7 @@ final class BusViewModel {
                     to: currentLocation.coordinate
                 )
             }
+            tracker.previousLocation = lastLocation
             tracker.lastLocation = currentLocation
             tracker.lastUpdateTime = updateTime
 
@@ -458,7 +482,6 @@ final class BusViewModel {
 
             predictions.append(contentsOf: predictionCandidates(
                 for: route,
-                targetStop: targetStop,
                 targetIndex: targetIndex
             ))
         }
@@ -469,7 +492,6 @@ final class BusViewModel {
 
     private func predictionCandidates(
         for route: Route,
-        targetStop: Stop,
         targetIndex: Int
     ) -> [ArrivalPrediction] {
         let routeVehicles = vehicles.filter { $0.routeCode == route.id }
@@ -487,20 +509,23 @@ final class BusViewModel {
         }
 
         let protectedBusID = protectedServingBusID(from: metrics)
+        let movingMetricsCount = metrics.filter(\.isMoving).count
+        let allowStationaryPrediction = routeVehicles.count == 1 || movingMetricsCount == 0
         let predictions = metrics.compactMap { metric -> PredictionCandidate? in
             guard metric.nearestRouteStopDistance <= activeRouteGeofenceDistance else { return nil }
+            guard metric.isMoving || allowStationaryPrediction else { return nil }
+            guard let routeAnchor = metric.routeAnchor else { return nil }
             guard !metric.isOffRouteCluster else { return nil }
             if metric.isParkedTooLong, metric.bus.id != protectedBusID {
                 return nil
             }
 
-            let eta = calculateETA(
+            guard let eta = calculateETA(
                 for: metric.bus,
                 route: route,
-                targetStop: targetStop,
                 targetIndex: targetIndex,
-                routeAnchor: metric.routeAnchor
-            )
+                routeAnchor: routeAnchor
+            ) else { return nil }
 
             return PredictionCandidate(
                 prediction: ArrivalPrediction(
@@ -511,6 +536,11 @@ final class BusViewModel {
                 ),
                 isProtected: metric.bus.id == protectedBusID,
                 isMoving: metric.isMoving,
+                stabilityScore: stabilityScore(
+                    for: metric,
+                    routeAnchor: routeAnchor,
+                    movingMetricsCount: movingMetricsCount
+                ),
                 nearestRouteStopDistance: metric.nearestRouteStopDistance
             )
         }
@@ -547,11 +577,40 @@ final class BusViewModel {
             return lhs.isMoving
         }
 
+        if lhs.stabilityScore != rhs.stabilityScore {
+            return lhs.stabilityScore > rhs.stabilityScore
+        }
+
         if lhs.prediction.rawSeconds != rhs.prediction.rawSeconds {
             return lhs.prediction.rawSeconds < rhs.prediction.rawSeconds
         }
 
         return lhs.nearestRouteStopDistance < rhs.nearestRouteStopDistance
+    }
+
+    private func stabilityScore(
+        for metric: PredictionVehicleMetric,
+        routeAnchor: BusRouteAnchor,
+        movingMetricsCount: Int
+    ) -> Int {
+        var score = 0
+
+        if metric.isMoving {
+            score += 100
+        } else if movingMetricsCount == 0 {
+            score += 1
+        }
+
+        if routeAnchor.isHysteresisStable {
+            score += 40
+        }
+
+        if metric.isParkedTooLong {
+            score -= 100
+        }
+
+        score -= min(Int(metric.nearestRouteStopDistance / 10), 20)
+        return score
     }
 
     private func nearestRouteStopDistance(for bus: Bus, route: Route) -> Double {
@@ -589,28 +648,32 @@ final class BusViewModel {
     private func calculateETA(
         for bus: Bus,
         route: Route,
-        targetStop: Stop,
         targetIndex: Int,
-        routeAnchor: BusRouteAnchor?
-    ) -> ETAResult {
-        if let routeAnchor,
-           let upcomingStop = stop(at: routeAnchor.upcomingIndex, in: route),
-           route.stops.indices.contains(targetIndex) {
-           let stopsToTravel = stopsToTravel(
-                from: routeAnchor.upcomingIndex,
-                to: targetIndex,
-                stopCount: route.stops.count
-            )
-            let currentLocation = stableLocation(for: bus)
-            let timeToNext = currentLocation.distance(from: location(for: upcomingStop))
-                / max(inferredSpeed(for: bus), averageCampusSpeed)
-            let timeForRest = Double(stopsToTravel) * averageTimeBetweenStops
-            let totalSeconds = timeToNext + timeForRest
-            let isDue = stopsToTravel == 0 && timeToNext < 60
-            return formatETA(seconds: totalSeconds, isDue: isDue)
+        routeAnchor: BusRouteAnchor
+    ) -> ETAResult? {
+        guard let upcomingStop = stop(at: routeAnchor.upcomingIndex, in: route),
+              route.stops.indices.contains(targetIndex) else {
+            return nil
         }
 
-        return fallbackRoadDistanceETA(for: bus, to: targetStop)
+        let stopsToTravel = stopsToTravel(
+            from: routeAnchor.upcomingIndex,
+            to: targetIndex,
+            stopCount: route.stops.count,
+            isBackward: routeAnchor.isBackward
+        )
+        let currentLocation = stableLocation(for: bus)
+        let timeToNext = currentLocation.distance(from: location(for: upcomingStop))
+            / max(inferredSpeed(for: bus), averageCampusSpeed)
+        let timeForRest = Double(stopsToTravel) * averageTimeBetweenStops
+        let totalSeconds = timeToNext + timeForRest
+        guard totalSeconds.isFinite, totalSeconds >= 0 else { return nil }
+        if stopsToTravel <= shortHopStopLimit && totalSeconds > shortHopMaxETASeconds {
+            return nil
+        }
+
+        let isDue = stopsToTravel == 0 && timeToNext < 60
+        return formatETA(seconds: totalSeconds, isDue: isDue)
     }
 
     private func routeAnchor(for bus: Bus, route: Route) -> BusRouteAnchor? {
@@ -619,58 +682,174 @@ final class BusViewModel {
         guard let stableBearing = stableBearing(for: bus) else { return nil }
 
         let busLocation = stableLocation(for: bus)
-        var bestIndex: Int?
+        var bestAnchor: AnchorCandidate?
         var minDistance = CLLocationDistance.greatestFiniteMagnitude
 
         for (index, stop) in route.stops.enumerated() {
             let nextIndex = moduloIndex(index + 1, count: count)
-            guard let nextStop = self.stop(at: nextIndex, in: route) else { continue }
+            let previousIndex = moduloIndex(index - 1, count: count)
+            guard let nextStop = self.stop(at: nextIndex, in: route),
+                  let previousStop = self.stop(at: previousIndex, in: route) else { continue }
 
-            let routeBearing = bearing(from: stop.coordinate, to: nextStop.coordinate)
-            let angleDiff = angleDelta(from: stableBearing, to: routeBearing)
-            guard angleDiff < 90 else { continue }
+            let forwardBearing = bearing(from: stop.coordinate, to: nextStop.coordinate)
+            let backwardBearing = bearing(from: stop.coordinate, to: previousStop.coordinate)
+            let forwardDiff = angleDelta(from: stableBearing, to: forwardBearing)
+            let backwardDiff = angleDelta(from: stableBearing, to: backwardBearing)
+            let isForwardAligned = forwardDiff < 90
+            let isBackwardAligned = backwardDiff < 90
+            guard isForwardAligned || isBackwardAligned else { continue }
 
             let distance = busLocation.distance(from: location(for: stop))
             if distance < minDistance {
                 minDistance = distance
-                bestIndex = index
+                bestAnchor = AnchorCandidate(
+                    index: index,
+                    isBackward: isBackwardAligned && (!isForwardAligned || backwardDiff < forwardDiff)
+                )
             }
         }
 
-        guard let alignedIndex = bestIndex,
+        guard let alignedAnchor = bestAnchor,
               minDistance <= routeCorridorDistance,
-              let alignedStop = stop(at: alignedIndex, in: route) else {
+              let alignedStop = stop(at: alignedAnchor.index, in: route) else {
             return nil
         }
 
-        var upcomingIndex = alignedIndex
+        var isBackward = alignedAnchor.isBackward
+        if isBackward,
+           !isBackwardDirectionConsistent(for: bus, from: alignedAnchor.index, route: route) {
+            isBackward = false
+        }
+
+        var upcomingIndex = alignedAnchor.index
         let bearingToStop = bearing(from: busLocation.coordinate, to: alignedStop.coordinate)
         let angleDiff = angleDelta(from: stableBearing, to: bearingToStop)
         if angleDiff > passByAngle && minDistance > passByDistance {
             upcomingIndex = nextStopIndex(
-                after: alignedIndex,
-                stopCount: count
+                from: alignedAnchor.index,
+                stopCount: count,
+                isBackward: isBackward
             )
         }
 
+        let hysteresisResult = applyAnchorHysteresis(
+            for: bus,
+            candidateIndex: upcomingIndex,
+            stopCount: count,
+            isBackward: isBackward
+        )
+        upcomingIndex = hysteresisResult.upcomingIndex
+
         guard stop(at: upcomingIndex, in: route) != nil else { return nil }
-        return BusRouteAnchor(upcomingIndex: upcomingIndex)
+        return BusRouteAnchor(
+            upcomingIndex: upcomingIndex,
+            isBackward: isBackward,
+            isHysteresisStable: hysteresisResult.isStable
+        )
+    }
+
+    private func applyAnchorHysteresis(
+        for bus: Bus,
+        candidateIndex: Int,
+        stopCount: Int,
+        isBackward: Bool,
+        at currentTime: Date = Date()
+    ) -> AnchorHysteresisResult {
+        guard stopCount > 0 else {
+            return AnchorHysteresisResult(upcomingIndex: 0, isStable: false)
+        }
+
+        let key = speedTrackerKey(for: bus)
+        let normalizedCandidate = moduloIndex(candidateIndex, count: stopCount)
+        guard var tracker = speedTrackers[key] else {
+            return AnchorHysteresisResult(upcomingIndex: normalizedCandidate, isStable: false)
+        }
+
+        if let stationarySince = tracker.stationarySince,
+           currentTime.timeIntervalSince(stationarySince) >= parkedTimeout {
+            tracker.lastUpcomingIndex = normalizedCandidate
+            speedTrackers[key] = tracker
+            return AnchorHysteresisResult(upcomingIndex: normalizedCandidate, isStable: false)
+        }
+
+        guard let previousIndex = tracker.lastUpcomingIndex else {
+            tracker.lastUpcomingIndex = normalizedCandidate
+            speedTrackers[key] = tracker
+            return AnchorHysteresisResult(upcomingIndex: normalizedCandidate, isStable: false)
+        }
+
+        let normalizedPrevious = moduloIndex(previousIndex, count: stopCount)
+        let directionalDistance = directionalStopDistance(
+            from: normalizedPrevious,
+            to: normalizedCandidate,
+            stopCount: stopCount,
+            isBackward: isBackward
+        )
+
+        let acceptedIndex: Int
+        if directionalDistance <= 2 {
+            acceptedIndex = normalizedCandidate
+        } else {
+            acceptedIndex = normalizedPrevious
+        }
+
+        tracker.lastUpcomingIndex = acceptedIndex
+        speedTrackers[key] = tracker
+        return AnchorHysteresisResult(upcomingIndex: acceptedIndex, isStable: true)
+    }
+
+    private func directionalStopDistance(
+        from startIndex: Int,
+        to endIndex: Int,
+        stopCount: Int,
+        isBackward: Bool
+    ) -> Int {
+        guard stopCount > 0 else { return 0 }
+        if isBackward {
+            return moduloIndex(startIndex - endIndex, count: stopCount)
+        }
+
+        return moduloIndex(endIndex - startIndex, count: stopCount)
+    }
+
+    private func isBackwardDirectionConsistent(for bus: Bus, from index: Int, route: Route) -> Bool {
+        let count = route.stops.count
+        guard count > 0,
+              let speed = trackedSpeed(for: bus),
+              speed >= stableBearingSpeedThreshold,
+              let previousLocation = speedTrackers[speedTrackerKey(for: bus)]?.previousLocation else {
+            return false
+        }
+
+        let nextBackwardIndex = moduloIndex(index - 1, count: count)
+        guard let nextBackwardStop = stop(at: nextBackwardIndex, in: route) else { return false }
+
+        let stopLocation = location(for: nextBackwardStop)
+        let currentDistance = stableLocation(for: bus).distance(from: stopLocation)
+        let previousDistance = previousLocation.distance(from: stopLocation)
+        return previousDistance - currentDistance >= backwardDistanceDecreaseThreshold
     }
 
     private func nextStopIndex(
-        after index: Int,
-        stopCount: Int
+        from index: Int,
+        stopCount: Int,
+        isBackward: Bool
     ) -> Int {
         guard stopCount > 0 else { return 0 }
-        return moduloIndex(index + 1, count: stopCount)
+        return moduloIndex(index + (isBackward ? -1 : 1), count: stopCount)
     }
 
     private func stopsToTravel(
         from upcomingIndex: Int,
         to targetIndex: Int,
-        stopCount: Int
+        stopCount: Int,
+        isBackward: Bool
     ) -> Int {
         guard stopCount > 0 else { return 0 }
+        if isBackward {
+            return moduloIndex(upcomingIndex - targetIndex, count: stopCount)
+        }
+
         return moduloIndex(targetIndex - upcomingIndex, count: stopCount)
     }
 
@@ -678,13 +857,6 @@ final class BusViewModel {
         guard count > 0 else { return 0 }
         let remainder = index % count
         return remainder >= 0 ? remainder : remainder + count
-    }
-
-    private func fallbackRoadDistanceETA(for bus: Bus, to targetStop: Stop) -> ETAResult {
-        let currentLocation = stableLocation(for: bus)
-        let estimatedRoadDistance = currentLocation.distance(from: location(for: targetStop)) * roadDistanceMultiplier
-        let baseSeconds = estimatedRoadDistance / max(inferredSpeed(for: bus), averageCampusSpeed)
-        return formatETA(seconds: baseSeconds, isDue: baseSeconds < 60)
     }
 
     private func formatETA(seconds totalSeconds: Double, isDue: Bool) -> ETAResult {
@@ -738,11 +910,13 @@ final class BusViewModel {
 
 private struct BusSpeedTracker {
     var lastLocation: CLLocation?
+    var previousLocation: CLLocation?
     var lastSignificantLocation: CLLocation?
     var lastUpdateTime: Date?
     var stationarySince: Date?
     var inferredSpeed: Double?
     var stableBearing: Double?
+    var lastUpcomingIndex: Int?
 }
 
 private struct ETAResult {
@@ -752,6 +926,18 @@ private struct ETAResult {
 
 private struct BusRouteAnchor {
     let upcomingIndex: Int
+    let isBackward: Bool
+    let isHysteresisStable: Bool
+}
+
+private struct AnchorCandidate {
+    let index: Int
+    let isBackward: Bool
+}
+
+private struct AnchorHysteresisResult {
+    let upcomingIndex: Int
+    let isStable: Bool
 }
 
 private struct PredictionVehicleMetric {
@@ -767,6 +953,7 @@ private struct PredictionCandidate {
     let prediction: ArrivalPrediction
     let isProtected: Bool
     let isMoving: Bool
+    let stabilityScore: Int
     let nearestRouteStopDistance: Double
 }
 

@@ -12,7 +12,11 @@ import MapKit
 @available(iOS 26, *)
 struct LiquidGlassView: View {
     @Environment(BusViewModel.self) private var viewModel
-    
+
+    // Drives the stop-sheet Bento grid when the live API returns no predictions
+    // (nights, weekends, off-season). Started alongside the bus tracker below.
+    @State private var mockEngine = CABSMockEngine()
+
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: BusViewModel.osuCenter,
@@ -60,9 +64,25 @@ struct LiquidGlassView: View {
             .padding(.bottom, shouldShowInfoCard ? 8 : 50)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: shouldShowInfoCard)
             .ignoresSafeArea(.container, edges: .bottom) // Measure from physical screen edge
+            // MARK: - Stop Bottom Sheet
+            // Shown whenever the user taps a stop annotation.  Lives above
+            // everything else (zIndex 30) so it overlays the route buttons.
+            if viewModel.selectedStop != nil {
+                CABSBottomSheetView(viewModel: viewModel, mockEngine: mockEngine)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(30)
+            }
         }
-        .onAppear { viewModel.startTracking() }
-        .onDisappear { viewModel.stopTracking() }
+        .animation(.spring(response: 0.45, dampingFraction: 0.75),
+                   value: viewModel.selectedStop?.id)
+        .onAppear {
+            viewModel.startTracking()
+            mockEngine.start()   // keep mock ETAs ticking while the sheet is live
+        }
+        .onDisappear {
+            viewModel.stopTracking()
+            mockEngine.stop()
+        }
     }
     
     // MARK: - Helpers
@@ -81,7 +101,9 @@ struct LiquidGlassView: View {
     }
 
     private var shouldShowInfoCard: Bool {
-        viewModel.selectedRoute != nil
+        // Stop-sheet handles the stop case; show the info card only for
+        // route/vehicle modes so they don't overlap.
+        viewModel.selectedRoute != nil && viewModel.selectedStop == nil
     }
 }
 
@@ -103,8 +125,10 @@ struct LiquidMapLayer: View {
         .safeAreaPadding(.bottom, 100) // Push Apple Maps logo above buttons
         .ignoresSafeArea() // Map fills entire screen
         .onTapGesture {
-            viewModel.selectedStop = nil
-            viewModel.selectedVehicle = nil
+            withAnimation(.easeOut(duration: 0.22)) {
+                viewModel.selectedStop = nil
+                viewModel.selectedVehicle = nil
+            }
         }
         .onAppear {
             lockCameraToSelectedRoute(animated: false, clearSelection: false)
@@ -136,7 +160,9 @@ struct LiquidMapLayer: View {
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    viewModel.selectStop(stop)
+                    withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
+                        viewModel.selectStop(stop)
+                    }
                 }
                 .zIndex(1)
             }

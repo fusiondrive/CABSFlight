@@ -91,10 +91,76 @@ final class CABSLiveActivityManager {
             )
             trackedStop = stopName
             trackedRouteCode = routeCode
+            // Confirm the OS actually activated it. If activityState is anything
+            // other than .active the Dynamic Island will not appear — check the
+            // widget extension embedding steps below.
+            print("""
+            [CABSLiveActivityManager] ✓ Activity.request succeeded
+              id           : \(currentActivity?.id ?? "nil")
+              activityState: \(String(describing: currentActivity?.activityState))
+              stop         : \(stopName)  route: \(routeCode)
+              arrivalDate  : \(arrivalDate)
+            If the Dynamic Island is still not visible, the widget extension
+            .appex bundle is not embedded in the app — see setup steps below.
+            """)
+        } catch let authError as ActivityAuthorizationError {
+            switch authError {
+            case .denied:
+                print("""
+                [CABSLiveActivityManager] ✗ denied
+                  → The user disabled Live Activities for this app.
+                    Fix: Settings › \(Bundle.main.bundleIdentifier ?? "CABSFlight") › Live Activities → enable.
+                """)
+            case .unsupportedTarget:
+                // This is the error you'll see when the widget extension is not
+                // wired up correctly.  All three items below must be true:
+                //
+                //   1. CABSFlightAttributes.swift is compiled into the WIDGET EXTENSION target
+                //      Xcode → project navigator → select CABSFlightAttributes.swift
+                //      → File Inspector (⌥⌘1) → Target Membership → tick the widget extension
+                //
+                //   2. NSSupportsLiveActivities = YES is in the HOST APP's Info.plist
+                //      CABSFlight/Info.plist → add key NSSupportsLiveActivities, value YES
+                //
+                //   3. The widget bundle @main registers CABSFlightLiveActivity()
+                //      CABSFlightWidgetBundle.body must contain: CABSFlightLiveActivity()
+                print("""
+                [CABSLiveActivityManager] ✗ unsupportedTarget
+                  → Widget extension is not configured correctly. See inline comments above.
+                    failureReason    : \(authError.failureReason ?? "nil")
+                    recoverySuggestion: \(authError.recoverySuggestion ?? "nil")
+                """)
+            case .unentitled:
+                print("""
+                [CABSLiveActivityManager] ✗ unentitled
+                  → The app is missing the Live Activities entitlement.
+                    failureReason: \(authError.failureReason ?? "nil")
+                """)
+            case .unsupported:
+                print("""
+                [CABSLiveActivityManager] ✗ unsupported
+                  → This device does not support Live Activities (requires iOS 16.1+).
+                """)
+            case .targetMaximumExceeded:
+                print("[CABSLiveActivityManager] ✗ targetMaximumExceeded — call stopTracking() before starting a new one.")
+            case .globalMaximumExceeded:
+                print("[CABSLiveActivityManager] ✗ globalMaximumExceeded — too many system-wide activities running.")
+            case .attributesTooLarge:
+                print("[CABSLiveActivityManager] ✗ attributesTooLarge — CABSFlightAttributes exceeds the 4 KB limit.")
+            case .visibility:
+                print("[CABSLiveActivityManager] ✗ visibility — Live Activities can only be started from the foreground.")
+            default:
+                print("[CABSLiveActivityManager] ✗ ActivityAuthorizationError: \(authError) | \(authError.localizedDescription)")
+            }
         } catch {
-            // ActivityKit throws when the device can't support activities
-            // (simulator without Dynamic Island, Low Power Mode, etc.)
-            print("[CABSLiveActivityManager] Could not start Live Activity: \(error)")
+            let ns = error as NSError
+            print("""
+            [CABSLiveActivityManager] ✗ unexpected error
+              description : \(error.localizedDescription)
+              domain      : \(ns.domain)
+              code        : \(ns.code)
+              userInfo    : \(ns.userInfo)
+            """)
         }
     }
 

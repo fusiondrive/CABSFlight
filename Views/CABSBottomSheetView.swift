@@ -86,23 +86,26 @@ struct CABSBottomSheetView: View {
             }
         }
 
-        // Fallback: surface CABSMockEngine data during development / offline
+        // Fallback: surface CABSMockEngine data during development / offline.
+        // Try exact stop name first; if the real stop name doesn't match the
+        // engine's hardcoded names (e.g. "Drinko Library" vs "Drinko Hall"),
+        // fall through to the engine's full prediction list so the button is
+        // never stuck disabled purely due to a name mismatch.
         guard let engine = mockEngine else { return [] }
-        return engine.predictions
-            .filter { $0.stopName == stop.name }
-            .prefix(4)
-            .map { p in
-                SheetPrediction(
-                    id: p.id,
-                    routeCode: p.routeCode,
-                    busLabel: p.routeCode,
-                    timeDisplay: p.timeToArrivalInSeconds < 60
-                        ? "Due"
-                        : "\(p.timeToArrivalInSeconds / 60) min",
-                    rawSeconds: Double(p.timeToArrivalInSeconds),
-                    isDelayed: false
-                )
-            }
+        let exactMatch = engine.predictions.filter { $0.stopName == stop.name }
+        let source = exactMatch.isEmpty ? Array(engine.predictions) : exactMatch
+        return Array(source.prefix(4)).map { p -> SheetPrediction in
+            let mins = p.timeToArrivalInSeconds / 60
+            let display = p.timeToArrivalInSeconds < 60 ? "Due" : "\(mins) min"
+            return SheetPrediction(
+                id: p.id,
+                routeCode: p.routeCode,
+                busLabel: exactMatch.isEmpty ? "Mock · \(p.routeCode)" : p.routeCode,
+                timeDisplay: display,
+                rawSeconds: Double(p.timeToArrivalInSeconds),
+                isDelayed: false
+            )
+        }
     }
 
     private var leadPrediction: SheetPrediction? { predictions.first }
@@ -265,7 +268,7 @@ struct CABSBottomSheetView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
-            .foregroundStyle(isTrackingThisStop ? .primary : .white)
+            .foregroundStyle(isTrackingThisStop ? Color.primary : Color.white)
             .background {
                 if isTrackingThisStop {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
