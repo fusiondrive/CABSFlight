@@ -181,8 +181,8 @@ struct LiquidMapLayer: View {
                     routeColor: viewModel.selectedRoute?.officialColor ?? .red,
                     isSelected: viewModel.selectedStop?.id == stop.id
                 )
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
+                .frame(width: 36, height: 36)
+                .contentShape(Circle())
                 .mapItemPressEffect(isSelected: viewModel.selectedStop?.id == stop.id) {
                     // Offset the camera center upward so the pin sits in the
                     // visible top ~60 % of the screen above the 350 pt sheet.
@@ -205,7 +205,7 @@ struct LiquidMapLayer: View {
                         ))
                     }
                 }
-                .zIndex(1)
+                .zIndex(viewModel.selectedStop?.id == stop.id ? 10 : 1)
             }
         }
     }
