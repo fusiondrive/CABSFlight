@@ -33,9 +33,3 @@ enum CABSColors {
     }
 }
 
-extension Route {
-    /// Official CABS color for this route (overrides API color)
-    var officialColor: Color {
-        CABSColors.color(for: id)
-    }
-}

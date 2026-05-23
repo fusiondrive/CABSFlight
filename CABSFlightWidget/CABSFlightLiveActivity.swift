@@ -6,8 +6,9 @@
 //  and all three Dynamic Island presentations.
 //
 //  Design notes:
-//  • All color logic lives in BusBadgeView.swift (routeColor + BusBadgeView).
-//    This file only handles layout and ETA formatting.
+//  • Colors come from CABSColors.color(for:) — the same function the main app
+//    uses. No color values are defined here or in BusBadgeView.swift.
+//    To change a route color, edit CABSColors.swift only.
 //  • ETAs are minute-granularity, not ticking seconds — the CABS API is not
 //    precise to the second, so ticking creates false urgency.
 //  • The entire Lock Screen card tints to the route's brand color via
@@ -41,7 +42,7 @@ struct CABSFlightLiveActivity: Widget {
             )
             // The system tints the card container to the route's brand color.
             // Our dark overlay inside ensures text stays readable on any hue.
-            .activityBackgroundTint(routeColor(for: context.attributes.routeCode))
+            .activityBackgroundTint(CABSColors.color(for: context.attributes.routeCode))
             .activitySystemActionForegroundColor(.white)
 
         } dynamicIsland: { context in
@@ -68,7 +69,7 @@ struct CABSFlightLiveActivity: Widget {
             } minimal: {
                 IslandMinimal(routeCode: context.attributes.routeCode)
             }
-            .keylineTint(routeColor(for: context.attributes.routeCode))
+            .keylineTint(CABSColors.color(for: context.attributes.routeCode))
         }
     }
 }
@@ -102,7 +103,7 @@ private struct LockScreenBanner: View {
     let attributes: CABSFlightAttributes
     let state: CABSFlightAttributes.ContentState
 
-    private var color: Color { routeColor(for: attributes.routeCode) }
+    private var color: Color { CABSColors.color(for: attributes.routeCode) }
 
     var body: some View {
         HStack(spacing: 14) {
@@ -162,7 +163,7 @@ private struct IslandCompactLeading: View {
         // Compact slot is 22 × 22 pt — circular badge with bus glyph fits better
         // than a square text badge at this size.
         ZStack {
-            Circle().fill(routeColor(for: routeCode))
+            Circle().fill(CABSColors.color(for: routeCode))
             Image(systemName: "bus.fill")
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.white)
@@ -187,7 +188,7 @@ private struct IslandMinimal: View {
     let routeCode: String
     var body: some View {
         ZStack {
-            Circle().fill(routeColor(for: routeCode))
+            Circle().fill(CABSColors.color(for: routeCode))
             Image(systemName: "bus.fill")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.white)
@@ -247,7 +248,7 @@ private struct IslandBottom: View {
         HStack(spacing: 8) {
             Image(systemName: "bus.fill")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(routeColor(for: routeCode))
+                .foregroundStyle(CABSColors.color(for: routeCode))
 
             Text("Arrives at ")
                 .font(.system(size: 12, weight: .medium))

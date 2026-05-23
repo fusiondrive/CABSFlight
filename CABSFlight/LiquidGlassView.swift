@@ -114,6 +114,18 @@ struct LiquidMapLayer: View {
     @Bindable var viewModel: BusViewModel
     @Binding var cameraPosition: MapCameraPosition
 
+    /// Default campus-wide overview — mirrors the initial cameraPosition in
+    /// LiquidGlassView so dismissing a stop always returns to the same framing.
+    private let campusOverview: MapCameraPosition = .region(
+        MKCoordinateRegion(
+            center: BusViewModel.osuCenter,
+            span: MKCoordinateSpan(
+                latitudeDelta: BusViewModel.defaultSpan,
+                longitudeDelta: BusViewModel.defaultSpan
+            )
+        )
+    )
+
     var body: some View {
         Map(position: $cameraPosition) {
             polylineLayer
@@ -122,7 +134,7 @@ struct LiquidMapLayer: View {
         }
         .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
-        .safeAreaPadding(.bottom, 100) // Push Apple Maps logo above buttons
+        .safeAreaPadding(.bottom, 100)
         .ignoresSafeArea() // Map fills entire screen
         .onTapGesture {
             withAnimation(.easeOut(duration: 0.22)) {
@@ -135,6 +147,18 @@ struct LiquidMapLayer: View {
         }
         .onChange(of: routeCameraKey) { _, _ in
             lockCameraToSelectedRoute()
+        }
+        // Map frame is static (safeAreaPadding never changes), so the camera
+        // move fires immediately without any delay or teleport risk.
+        .onChange(of: viewModel.selectedStop) { _, newStop in
+            guard newStop == nil else { return }
+            if viewModel.selectedRoute != nil {
+                lockCameraToSelectedRoute(animated: true, clearSelection: false)
+            } else {
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    cameraPosition = campusOverview
+                }
+            }
         }
     }
 
@@ -159,9 +183,26 @@ struct LiquidMapLayer: View {
                 )
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
-                .onTapGesture {
+                .mapItemPressEffect(isSelected: viewModel.selectedStop?.id == stop.id) {
+                    // Offset the camera center upward so the pin sits in the
+                    // visible top ~60 % of the screen above the 350 pt sheet.
+                    // Padding is now static (100 pt) so the map frame never
+                    // changes — both mutations fire on the same frame without
+                    // causing a MapKit teleport.
+                    let span = 0.012
+                    let offsetLat = stop.coordinate.latitude - (span * 0.25)
+                    let targetCenter = CLLocationCoordinate2D(
+                        latitude: offsetLat,
+                        longitude: stop.coordinate.longitude
+                    )
                     withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
                         viewModel.selectStop(stop)
+                    }
+                    withAnimation(.easeInOut(duration: 0.6)) {
+                        cameraPosition = .region(MKCoordinateRegion(
+                            center: targetCenter,
+                            span: MKCoordinateSpan(latitudeDelta: span, longitudeDelta: span)
+                        ))
                     }
                 }
                 .zIndex(1)
@@ -179,7 +220,7 @@ struct LiquidMapLayer: View {
                 )
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
-                .onTapGesture {
+                .mapItemPressEffect(isSelected: viewModel.selectedVehicle?.id == bus.id) {
                     if viewModel.selectedVehicle?.id == bus.id {
                         viewModel.selectedVehicle = nil
                     } else {

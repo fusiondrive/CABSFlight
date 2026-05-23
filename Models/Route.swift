@@ -19,6 +19,11 @@ struct Route: Identifiable, Codable, Equatable {
     var color: Color {
         Color(hex: colorHex)
     }
+
+    /// Official branded color from CABSColors — overrides the API hex value.
+    var officialColor: Color {
+        CABSColors.color(for: id)
+    }
     
     /// Create a Route from API response data
     static func from(info: CABSRoutesListResponse.RouteInfo) -> Route {
