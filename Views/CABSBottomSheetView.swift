@@ -127,7 +127,7 @@ struct CABSBottomSheetView: View {
             Spacer()
             panel
         }
-        .ignoresSafeArea()
+        .ignoresSafeArea(edges: .bottom)
         .onChange(of: viewModel.selectedStop?.id) {
             // Reset drag position whenever the user selects a different stop.
             dragOffset = 0
@@ -137,7 +137,7 @@ struct CABSBottomSheetView: View {
     // MARK: - Panel
 
     private var panel: some View {
-        VStack(spacing: 0) {
+        LiquidBottomCardShell(tintColor: accentColor) {
             dragHandle
 
             VStack(alignment: .leading, spacing: 20) {
@@ -147,17 +147,9 @@ struct CABSBottomSheetView: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 4)
-            .padding(.bottom, 48)    // home-indicator buffer
         }
-        .glassEffect(
-            .regular.tint(accentColor.opacity(0.08)),
-            in: RoundedRectangle(cornerRadius: 28, style: .continuous)
-        )
-        .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: -4)
         .offset(y: max(0, dragOffset))
         .gesture(dismissGesture)
-        .padding(.horizontal, 8)
-        .padding(.bottom, 8)
     }
 
     // MARK: - Drag handle
@@ -167,7 +159,7 @@ struct CABSBottomSheetView: View {
             .fill(Color.primary.opacity(0.2))
             .frame(width: 40, height: 4)
             .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, 16)
             .frame(maxWidth: .infinity)
     }
 

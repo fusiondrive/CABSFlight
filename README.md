@@ -3,8 +3,9 @@
   <p><b>An experimental, fluid transit interface for the OSU CABS system.</b></p>
 
   <p>
-    <img src="https://img.shields.io/badge/Status-Under%20Construction-FF9900?style=for-the-badge" alt="Under Construction">
+    <img src="https://img.shields.io/badge/Status-Active%20Development-34C759?style=for-the-badge" alt="Active Development">
     <img src="https://img.shields.io/badge/Focus-UI%2FUX%20Design-FF2D55?style=for-the-badge" alt="UI/UX">
+    <img src="https://img.shields.io/badge/Platform-iOS%2026-000000?style=for-the-badge&logo=apple" alt="iOS 26">
   </p>
 </div>
 
@@ -12,15 +13,30 @@
 
 ## Overview
 
-CABSFlight is an unofficial, real-time campus transit tracker designed with a relentless focus on aesthetics and user experience. 
+CABSFlight is an unofficial, real-time campus transit tracker designed with a relentless focus on aesthetics and user experience.
 
-Currently in its very early stages of development, the project explores how modern Apple design languages—specifically the "Liquid Glass" aesthetic—can transform a standard utility app into a premium, tactile experience. It aims to solve the friction of inaccurate bus ETAs while delivering an uncompromising, fluid interface.
+The project explores how modern Apple design languages—specifically the "Liquid Glass" aesthetic—can transform a standard utility app into a premium, tactile experience. It aims to solve the friction of inaccurate bus ETAs while delivering an uncompromising, fluid interface.
+
+The current prototype already runs an end-to-end tracking experience against a self-contained local simulation: live bus movement, stop-aware ETA prediction, Live Activities, and a Dynamic Island integration, all wired to the UI without a backend dependency.
+
+---
+
+## Recent Updates
+
+A summary of where the project has moved since the initial prototype:
+
+* **Live Activity + Dynamic Island** — Compact, Expanded, and Lock Screen presentations for live bus arrival tracking.
+* **Local simulation engine** — `CABSMockEngine` simulates vehicle movement, ETAs, and stop predictions, decoupling the entire UI layer from the backend during development.
+* **Activity lifecycle management** — `CABSLiveActivityManager` starts, updates, and ends Live Activities from the bottom drawer / tracking flow.
+* **Route color system** — `BusBadgeView` + `CABSColors` give each route a consistent identity across the app and Live Activities.
+* **Map stability** — Fixed camera race conditions and locked the map viewport to route stops to prevent extreme zoom-out, with broader UI stabilization for folded loops like the WMC route.
+* **Map layer polish** — Tuned stop-marker size and shape in `LiquidMapLayer` for clearer at-a-glance readability.
 
 ---
 
 ## Showcase
 
-*Note: The project is still heavily under construction. The screenshots below represent early UI/UX prototypes.*
+*The screenshots below represent current UI/UX prototypes running against the local simulation engine.*
 
 <div align="center">
   <table>
@@ -34,6 +50,16 @@ Currently in its very early stages of development, the project explores how mode
       <td><img src="https://fusiondrive.github.io/assets/CABSF/boarding2.png" alt="Onboarding 2" width="250"></td>
       <td><img src="https://fusiondrive.github.io/assets/CABSF/inapp.png" alt="In-App View" width="250"></td>
     </tr>
+    <tr>
+      <td align="center"><b>Dynamic Island (Expanded / Compact)</b></td>
+      <td align="center"><b>Lock Screen Live Activity</b></td>
+      <td align="center"><b>Live Bus Tracking</b></td>
+    </tr>
+    <tr>
+      <td><!-- TODO: Add Dynamic Island screenshot (expanded + compact states) here --><img src="https://via.placeholder.com/250x540.png?text=Dynamic+Island+%28Coming+Soon%29" alt="Dynamic Island placeholder" width="250"></td>
+      <td><!-- TODO: Add Lock Screen Live Activity screenshot here --><img src="https://via.placeholder.com/250x540.png?text=Lock+Screen+Live+Activity+%28Coming+Soon%29" alt="Lock Screen Live Activity placeholder" width="250"></td>
+      <td><!-- TODO: Add live tracking / map screenshot here --><img src="https://via.placeholder.com/250x540.png?text=Live+Tracking+%28Coming+Soon%29" alt="Live tracking placeholder" width="250"></td>
+    </tr>
   </table>
 </div>
 
@@ -44,36 +70,84 @@ Currently in its very early stages of development, the project explores how mode
 Rather than focusing solely on backend data, this project is an exercise in frontend interaction design:
 
 * **Liquid Glass Aesthetic:** Utilizing modern iOS materials to create a sense of depth. Floating panels and route chips realistically refract the underlying map, making the UI feel like physical glass.
-* **Algorithmic User Experience:** Exploring a custom prediction model that factors in stop dwell times and campus traffic, preventing the infinite "1 minute away" problem when buses are holding at terminals.
-* **Physics-Based Interactions:** Implementing seamless state transitions and tactile feedback so the interface feels organic and responsive to touch.
+* **Algorithmic User Experience:** A custom prediction model factors in stop dwell times and campus traffic, preventing the infinite "1 minute away" problem when buses are holding at terminals.
+* **Physics-Based Interactions:** Seamless state transitions and tactile feedback so the interface feels organic and responsive to touch.
+* **Glanceable Live Activities:** Bringing the tracking experience out of the app and onto the Lock Screen and Dynamic Island.
 
 ---
 
-## Development Status & To-Do List
+## Development Status
 
-This project is currently in the **Initial Prototype Phase**. Core UI components are being built and tested before full data integration.
+This project is in **active development**. The prototype already includes Live Activities and Dynamic Island (validated against a local mock environment), and map interaction and stability are being iterated on continuously (camera race-condition fixes, viewport locking, UI stabilization).
+
+**Done / In Progress**
 
 - [x] Initial MapKit setup and custom map styling
 - [x] "Liquid Glass" UI architecture and layout
 - [x] Onboarding flow with Mesh Gradient backgrounds
-- [ ] **Live Activities & Dynamic Island:** Context-aware countdowns notifying users exactly when to leave for the bus stop based on their real-time walking distance.
-- [ ] **Predictive Scheduling:** Glanceable upcoming bus itineraries and departure previews to reduce wait anxiety.
-- [ ] **Multi-Route Orchestration:** Seamless UX flows for handling complex transfers and multi-bus campus commutes.
+- [x] **Local simulation engine** (`CABSMockEngine`) for ETAs and vehicle state
+- [x] **Live Activities & Dynamic Island** — Compact / Expanded / Lock Screen presentations
+- [x] **Route color system** (`BusBadgeView` + `CABSColors`)
+- [x] **Map robustness** — camera race-condition fixes and viewport locking
+- [~] **Predictive scheduling** — stop-aware ETA holding, with glanceable itineraries in progress
+
+**Planned**
+
+- [ ] **Live data integration** — swap the mock engine for the real CABS endpoint (the public model shape is already aligned)
+- [ ] **Multi-Route Orchestration:** Seamless UX flows for complex transfers and multi-bus commutes.
 - [ ] **Smooth Movement Interpolation:** Physics-based vehicle animations to eliminate jarring map-marker jumps.
+
+---
+
+## Project Structure
+
+```
+CABSFlight/
+├── CABSFlight/                  # Main app target
+│   ├── CABSMockEngine.swift     # Self-contained local simulation (ETAs, vehicle state)
+│   ├── LiquidGlassView.swift    # Liquid Glass map UI + LiquidMapLayer
+│   ├── CABSColors.swift         # Shared route color palette
+│   └── ...
+├── CABSFlightWidget/            # Live Activity / Dynamic Island target
+│   ├── CABSFlightLiveActivity.swift   # Live Activity entry point & presentations
+│   ├── BusBadgeView.swift             # Route badge used in Live Activities
+│   └── CABSColors.swift
+├── CABSFlightAttributes.swift   # ActivityAttributes / shared Live Activity data model
+├── Models/                      # Bus, Route, Stop, APIResponse
+├── ViewModels/                  # Tracking, API service, CABSLiveActivityManager, preferences
+├── Views/                       # Map container, bottom sheet, onboarding, route picker, settings
+└── Theme/                       # GlassCard and theming
+```
 
 ---
 
 ## Tech Stack
 
-* **Platform:** iOS (Swift, SwiftUI)
-* **Frameworks:** MapKit
+* **Platform:** iOS 26 (Swift, SwiftUI)
+* **Frameworks:** SwiftUI, MapKit (custom map layer + interaction-stability work), ActivityKit & WidgetKit (Live Activities / Dynamic Island)
+* **Architecture:** MVVM, with `CABSMockEngine` as a swappable local data source mirroring the eventual live API shape
 * **Design Tools:** Figma, Apple HIG
+
+---
+
+## Getting Started
+
+**Requirements**
+
+* Xcode 26 or newer (iOS 26 SDK)
+* iOS 26 deployment target — Live Activities and Dynamic Island require a recent OS / device
+
+**Run**
+
+1. Open `CABSFlight.xcodeproj` in Xcode.
+2. Select the **CABSFlight** scheme and a simulator or device running iOS 26+.
+3. Build & run. The app launches against `CABSMockEngine`, so no backend or API keys are required to explore the full UI.
 
 ---
 
 ## About the Developer
 
-Designed and engineered by **Steve Wang**. 
+Designed and engineered by **Steve Wang**.
 
 I am a Senior Electrical and Computer Engineering student at The Ohio State University, specializing in bridging the gap between technical engineering and high-fidelity visual design.
 

@@ -61,7 +61,7 @@ struct LiquidGlassView: View {
                 }
             }
             // Dynamic bottom padding: lift buttons when no card, tight when card shown
-            .padding(.bottom, shouldShowInfoCard ? 8 : 50)
+            .padding(.bottom, shouldShowInfoCard ? 0 : 50)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: shouldShowInfoCard)
             .ignoresSafeArea(.container, edges: .bottom) // Measure from physical screen edge
             // MARK: - Stop Bottom Sheet
@@ -350,6 +350,33 @@ struct LiquidBusMarker: View {
     }
 }
 
+// MARK: - Liquid Bottom Card Shell
+
+/// Single source of truth for the glass card shell used by LiquidInfoCard
+/// and CABSBottomSheetView. Callers supply tintColor and content; this view
+/// owns every layout, glass, shadow, and safe-area modifier so both cards
+/// are pixel-perfect matches.
+@available(iOS 26, *)
+struct LiquidBottomCardShell<Content: View>: View {
+    let tintColor: Color
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            content()
+        }
+        .padding(.bottom, 44)
+        .glassEffect(
+            .regular.tint(tintColor.opacity(0.1)),
+            in: RoundedRectangle(cornerRadius: 38, style: .continuous)
+        )
+        .shadow(color: .black.opacity(0.15), radius: 15, y: 8)
+        .ignoresSafeArea(edges: .bottom)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 16)
+    }
+}
+
 @available(iOS 26, *)
 struct LiquidInfoCard: View {
     @Bindable var viewModel: BusViewModel
@@ -364,138 +391,117 @@ struct LiquidInfoCard: View {
         return "ROUTE"
     }
     
-    /// Dynamic corner radius based on device
-    private var cornerRadius: CGFloat { ScreenCornerRadius.current }
-    
     /// Route color for glow effect
     private var routeColor: Color { viewModel.selectedRoute?.officialColor ?? .blue }
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Header row
-            HStack {
-                Text(statusTitle)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.secondary)
-                    .tracking(1)
-                Spacer()
-                if !viewModel.vehicles.isEmpty {
-                    HStack(spacing: 4) {
-                        Circle().fill(.green).frame(width: 6, height: 6)
-                        Text("LIVE").font(.system(size: 10, weight: .bold)).foregroundColor(.green)
+        LiquidBottomCardShell(tintColor: routeColor) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(statusTitle)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.secondary)
+                        .tracking(1)
+                    Spacer()
+                    if !viewModel.vehicles.isEmpty {
+                        HStack(spacing: 4) {
+                            Circle().fill(.green).frame(width: 6, height: 6)
+                            Text("LIVE").font(.system(size: 10, weight: .bold)).foregroundColor(.green)
+                        }
+                        .padding(.horizontal, 8).padding(.vertical, 4)
+                        .background(.green.opacity(0.15), in: Capsule())
                     }
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(.green.opacity(0.15), in: Capsule())
                 }
-            }
-            
-            // CRITICAL FIX: Group + .id forces SwiftUI to swap views instantly
-            // instead of interpolating between them (which causes text overlap/twitching)
-            Group {
-                if let bus = selectedVehicle {
-                    // Vehicle mode
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.right.circle.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(routeColor)
-                            Text(bus.destination ?? "En Route")
+
+                // Group + .id forces SwiftUI to swap views instantly instead of
+                // interpolating between them (prevents text overlap/twitching).
+                Group {
+                    if let bus = selectedVehicle {
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(routeColor)
+                                Text(bus.destination ?? "En Route")
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundColor(.primary)
+                            }
+                            HStack(spacing: 12) {
+                                Label("\(viewModel.estimatedSpeedMPH(for: bus)) mph", systemImage: "speedometer")
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                if bus.delayed {
+                                    Label("Delayed", systemImage: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.orange)
+                                }
+                                Spacer()
+                                Button { onFocusBus?(bus) } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "location.fill").font(.system(size: 10))
+                                        Text("Bus \(bus.id)").font(.system(size: 12, weight: .semibold))
+                                    }
+                                    .foregroundColor(.primary.opacity(0.8))
+                                    .padding(.horizontal, 10).padding(.vertical, 5)
+                                    .background(.ultraThinMaterial, in: Capsule())
+                                    .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 1))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    } else if let stop = selectedStop {
+                        let preds = viewModel.predictions(for: stop)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(stop.name)
                                 .font(.system(size: 22, weight: .bold))
                                 .foregroundColor(.primary)
-                        }
-                        HStack(spacing: 12) {
-                            Label("\(viewModel.estimatedSpeedMPH(for: bus)) mph", systemImage: "speedometer")
-                                .font(.system(size: 13, weight: .medium))
+                            Text("Approaching Buses")
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(.secondary)
-                            if bus.delayed {
-                                Label("Delayed", systemImage: "exclamationmark.triangle.fill")
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundColor(.orange)
-                            }
-                            Spacer()
-                            Button { onFocusBus?(bus) } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "location.fill").font(.system(size: 10))
-                                    Text("Bus \(bus.id)").font(.system(size: 12, weight: .semibold))
+                            if preds.isEmpty {
+                                Text("No buses approaching.")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(.secondary)
+                            } else {
+                                ForEach(preds.prefix(5)) { pred in
+                                    HStack(spacing: 8) {
+                                        Text(pred.route.id)
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(pred.route.officialColor, in: Capsule())
+                                        Text("Bus \(pred.bus.id)")
+                                            .font(.system(size: 14, weight: .medium))
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Text(pred.timeDisplay)
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundColor(pred.timeDisplay == "Due" ? .green : .secondary)
+                                    }
                                 }
-                                .foregroundColor(.primary.opacity(0.8))
-                                .padding(.horizontal, 10).padding(.vertical, 5)
-                                .background(.ultraThinMaterial, in: Capsule())
-                                .overlay(Capsule().stroke(.white.opacity(0.2), lineWidth: 1))
                             }
-                            .buttonStyle(.plain)
                         }
-                    }
-                } else if let stop = selectedStop {
-                    // Station mode with multi-route predictions
-                    let preds = viewModel.predictions(for: stop)
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(stop.name)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.primary)
-                        Text("Approaching Buses")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.secondary)
-                        if preds.isEmpty {
-                            Text("No buses approaching.")
+                    } else if let route = selectedRoute {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(route.name)
+                                .font(.system(size: 22, weight: .bold))
+                                .foregroundColor(.primary)
+                            Text("\(viewModel.vehicles.count) buses currently active")
                                 .font(.system(size: 14, weight: .medium))
                                 .foregroundColor(.secondary)
-                        } else {
-                            ForEach(preds.prefix(5)) { pred in
-                                HStack(spacing: 8) {
-                                    // Route badge capsule
-                                    Text(pred.route.id)
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background(pred.route.officialColor, in: Capsule())
-
-                                    // Bus identifier
-                                    Text("Bus \(pred.bus.id)")
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.primary)
-
-                                    Spacer()
-
-                                    // ETA from advanced prediction algorithm
-                                    Text(pred.timeDisplay)
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(pred.timeDisplay == "Due" ? .green : .secondary)
-                                }
-                            }
+                            Text("Tap a bus or station for details.")
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.secondary)
                         }
                     }
-                } else if let route = selectedRoute {
-                    // Route mode
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(route.name)
-                            .font(.system(size: 22, weight: .bold))
-                            .foregroundColor(.primary)
-                        Text("\(viewModel.vehicles.count) buses currently active")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundColor(.secondary)
-                        Text("Tap a bus or station for details.")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(.secondary)
-                    }
                 }
+                .id(statusTitle + (selectedVehicle?.id ?? "") + (selectedStop?.id ?? ""))
+                .transition(.opacity.animation(.easeInOut(duration: 0.15)))
             }
-            .id(statusTitle + (selectedVehicle?.id ?? "") + (selectedStop?.id ?? ""))
-            .transition(.opacity.animation(.easeInOut(duration: 0.15)))
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
         }
-        .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 44) // Home indicator (34pt) + buffer (10pt)
-        // Native iOS 26 Liquid Glass effect
-        .glassEffect(
-            .regular.tint(routeColor.opacity(0.1)),
-            in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        )
-        .shadow(color: .black.opacity(0.15), radius: 15, y: 8)
-        .ignoresSafeArea(edges: .bottom) // Glass touches bottom
-        .padding(.horizontal, 8) // Tighter side margins
-        .padding(.bottom, 8) // Sink card close to bezel (8pt gap)
     }
 }
 
