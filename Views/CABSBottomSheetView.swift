@@ -3,40 +3,18 @@
 //  CABSFlight
 //
 //  Custom Liquid Glass bottom sheet that slides up when the user taps a
-//  bus stop on the map.  Displays arriving buses in a Bento grid and
+//  bus stop on the map. Displays arriving buses in a Bento grid and
 //  exposes the "Track via Dynamic Island" button that fires
 //  CABSLiveActivityManager.
-//
-//  Wiring into LiquidGlassView (see comments at the bottom of this file):
-//
-//    1. In LiquidGlassView.body ZStack, add:
-//
-//         Group {
-//             if viewModel.selectedStop != nil {
-//                 CABSBottomSheetView(viewModel: viewModel)
-//                     .transition(...)
-//             }
-//         }
-//         .animation(.spring(response: 0.45, dampingFraction: 0.75),
-//                    value: viewModel.selectedStop?.id)
-//         .zIndex(30)
-//
-//    2. Change shouldShowInfoCard to:
-//         viewModel.selectedRoute != nil && viewModel.selectedStop == nil
-//
-//    3. Wrap stop-annotation tap in:
-//         withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
-//             viewModel.selectStop(stop)
-//         }
 //
 
 import SwiftUI
 import ActivityKit
 
-// MARK: - Unified prediction model (bridges live API + mock engine)
+// MARK: - Unified Prediction Model
 
-/// Internal display-only prediction that unifies ArrivalPrediction (live API)
-/// and MockStopPrediction (CABSMockEngine) so the sheet has a single rendering path.
+/// Internal display-only prediction that unifies `ArrivalPrediction` (live API)
+/// and `MockStopPrediction` (CABSMockEngine) so the sheet has a single rendering path.
 private struct SheetPrediction: Identifiable {
     let id: String
     let routeCode: String
@@ -50,25 +28,27 @@ private struct SheetPrediction: Identifiable {
 
 // MARK: - Bottom Sheet View
 
+/// Bottom sheet displayed when the user selects a stop annotation on the map.
 @available(iOS 26, *)
 struct CABSBottomSheetView: View {
 
     @Bindable var viewModel: BusViewModel
 
-    /// Pass the shared CABSMockEngine instance so the sheet can fall back to
-    /// simulated ETAs when the live API hasn't returned predictions yet.
+    /// Shared `CABSMockEngine` instance for simulated ETAs when the live API
+    /// has not yet returned predictions for this stop.
     var mockEngine: CABSMockEngine? = nil
 
-    // MARK: Private state
+    // MARK: - State Properties
 
     @State private var dragOffset: CGFloat = 0
     private let manager = CABSLiveActivityManager.shared
 
-    // MARK: Derived
+    // MARK: - Derived Data
 
     private var stop: Stop? { viewModel.selectedStop }
 
-    /// Unified list — live predictions first, mock fallback if empty.
+    /// Unified prediction list — live API results take priority; falls back to
+    /// the mock engine so the sheet is never empty during development or offline.
     private var predictions: [SheetPrediction] {
         guard let stop else { return [] }
 
@@ -86,11 +66,10 @@ struct CABSBottomSheetView: View {
             }
         }
 
-        // Fallback: surface CABSMockEngine data during development / offline.
-        // Try exact stop name first; if the real stop name doesn't match the
-        // engine's hardcoded names (e.g. "Drinko Library" vs "Drinko Hall"),
-        // fall through to the engine's full prediction list so the button is
-        // never stuck disabled purely due to a name mismatch.
+        // Fall back to CABSMockEngine data when the live API is unavailable.
+        // Try an exact stop-name match first; if the real stop name doesn't
+        // match the engine's hardcoded names, use the full prediction list so
+        // the Track button is never stuck disabled purely due to a name mismatch.
         guard let engine = mockEngine else { return [] }
         let exactMatch = engine.predictions.filter { $0.stopName == stop.name }
         let source = exactMatch.isEmpty ? Array(engine.predictions) : exactMatch
@@ -152,18 +131,18 @@ struct CABSBottomSheetView: View {
         .gesture(dismissGesture)
     }
 
-    // MARK: - Drag handle
+    // MARK: - Drag Handle
 
     private var dragHandle: some View {
         Capsule()
             .fill(Color.primary.opacity(0.2))
-            .frame(width: 40, height: 4)
+            .frame(width: Theme.UI.dragHandleWidth, height: Theme.UI.dragHandleHeight)
             .padding(.top, 12)
             .padding(.bottom, 16)
             .frame(maxWidth: .infinity)
     }
 
-    // MARK: - Stop header
+    // MARK: - Stop Header
 
     private var stopHeader: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -181,7 +160,7 @@ struct CABSBottomSheetView: View {
             Spacer()
 
             Button {
-                withAnimation(.easeOut(duration: 0.22)) {
+                withAnimation(Theme.Anim.dismissEaseOut) {
                     viewModel.selectedStop = nil
                 }
             } label: {
@@ -194,7 +173,7 @@ struct CABSBottomSheetView: View {
         }
     }
 
-    // MARK: - Predictions section
+    // MARK: - Predictions Section
 
     @ViewBuilder
     private var predictionsSection: some View {
@@ -232,7 +211,7 @@ struct CABSBottomSheetView: View {
         }
     }
 
-    // MARK: - Track button
+    // MARK: - Track Button
 
     @ViewBuilder
     private var trackButton: some View {
@@ -263,17 +242,17 @@ struct CABSBottomSheetView: View {
             .foregroundStyle(isTrackingThisStop ? Color.primary : Color.white)
             .background {
                 if isTrackingThisStop {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.UI.bentoCardCornerRadius, style: .continuous)
                         .fill(.ultraThinMaterial)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: Theme.UI.bentoCardCornerRadius, style: .continuous)
                                 .stroke(.white.opacity(0.25), lineWidth: 1)
                         )
                 } else {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    RoundedRectangle(cornerRadius: Theme.UI.bentoCardCornerRadius, style: .continuous)
                         .fill(accentColor.gradient)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            RoundedRectangle(cornerRadius: Theme.UI.bentoCardCornerRadius, style: .continuous)
                                 .fill(.white.opacity(0.14))
                         )
                         .shadow(color: accentColor.opacity(0.5), radius: 10, x: 0, y: 4)
@@ -283,10 +262,10 @@ struct CABSBottomSheetView: View {
         .buttonStyle(.plain)
         .disabled(noTarget)
         .opacity(noTarget ? 0.5 : 1.0)
-        .animation(.easeInOut(duration: 0.2), value: isTrackingThisStop)
+        .animation(Theme.Anim.selectionFeedback, value: isTrackingThisStop)
     }
 
-    // MARK: - Dismiss gesture
+    // MARK: - Dismiss Gesture
 
     private var dismissGesture: some Gesture {
         DragGesture()
@@ -296,19 +275,19 @@ struct CABSBottomSheetView: View {
                 }
             }
             .onEnded { value in
-                if value.translation.height > 80 {
-                    withAnimation(.easeOut(duration: 0.22)) {
+                if value.translation.height > Theme.UI.dragDismissThreshold {
+                    withAnimation(Theme.Anim.dismissEaseOut) {
                         viewModel.selectedStop = nil
                     }
                 } else {
-                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                    withAnimation(Theme.Anim.dismissSpring) {
                         dragOffset = 0
                     }
                 }
             }
     }
 
-    // MARK: - Tracking helper
+    // MARK: - Tracking Helper
 
     private func trackPrediction(_ pred: SheetPrediction) async {
         let arrival = Date().addingTimeInterval(pred.rawSeconds)
@@ -323,8 +302,8 @@ struct CABSBottomSheetView: View {
 
 // MARK: - Prediction Bento Card
 
-/// Compact card in the 2-column Bento grid.  Tapping a card tracks THAT
-/// specific route, allowing the user to pick between multiple arriving buses.
+/// Compact card in the 2-column Bento grid. Tapping a card tracks that specific
+/// route, allowing the user to choose between multiple simultaneously arriving buses.
 @available(iOS 26, *)
 private struct PredictionBentoCard: View {
     let prediction: SheetPrediction
@@ -334,7 +313,7 @@ private struct PredictionBentoCard: View {
     var body: some View {
         Button(action: onTrack) {
             VStack(alignment: .leading, spacing: 8) {
-                // Row 1 — route badge + "live" indicator
+                // Route badge and active-tracking indicator
                 HStack(alignment: .center) {
                     Text(prediction.routeCode)
                         .font(.system(size: 12, weight: .heavy))
@@ -353,7 +332,7 @@ private struct PredictionBentoCard: View {
                     }
                 }
 
-                // Row 2 — large ETA countdown
+                // Large ETA countdown
                 Text(prediction.timeDisplay)
                     .font(.system(size: 24, weight: .heavy, design: .rounded))
                     .foregroundStyle(prediction.isDelayed ? Color.orange : Color.primary)
@@ -361,22 +340,22 @@ private struct PredictionBentoCard: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
 
-                // Row 3 — bus identifier
+                // Bus identifier
                 Text(prediction.busLabel)
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .padding(14)
+            .padding(Theme.UI.bentoCardPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
             .glassEffect(
                 isTracked
                     ? .regular.tint(prediction.color.opacity(0.22)).interactive(true)
                     : .regular.interactive(true),
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                in: RoundedRectangle(cornerRadius: Theme.UI.bentoCardCornerRadius, style: .continuous)
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: Theme.UI.bentoCardCornerRadius, style: .continuous)
                     .strokeBorder(
                         isTracked ? prediction.color.opacity(0.55) : Color.clear,
                         lineWidth: 1.5
@@ -384,6 +363,6 @@ private struct PredictionBentoCard: View {
             )
         }
         .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.2), value: isTracked)
+        .animation(Theme.Anim.selectionFeedback, value: isTracked)
     }
 }

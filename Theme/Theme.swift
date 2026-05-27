@@ -2,109 +2,182 @@
 //  Theme.swift
 //  CABSFlight
 //
-//  Created by Steve on 2/7/26.
-//
 
 import SwiftUI
 
-/// Flighty-inspired dark theme constants
+/// Central design-token registry for the CABSFlight Liquid Glass UI.
+/// All layout constants, animation presets, and map parameters live here
+/// to eliminate magic numbers across view files.
 enum Theme {
+
     // MARK: - Colors
-    
-    /// Deep black background
-    static let background = Color(hex: "#0A0A0A")
-    
-    /// Slightly elevated card background
-    static let cardBackground = Color(hex: "#1A1A1A")
-    
-    /// Subtle border color
-    static let border = Color.white.opacity(0.08)
-    
-    /// Primary accent - electric blue
-    static let accent = Color(hex: "#007AFF")
-    
-    /// Secondary accent - warm gold
+
+    static let background      = Color(hex: "#0A0A0A")
+    static let cardBackground  = Color(hex: "#1A1A1A")
+    static let border          = Color.white.opacity(0.08)
+    static let accent          = Color(hex: "#007AFF")
     static let accentSecondary = Color(hex: "#FFD60A")
-    
-    /// Primary text
-    static let textPrimary = Color.white
-    
-    /// Secondary text
-    static let textSecondary = Color.white.opacity(0.6)
-    
-    /// Tertiary/muted text
-    static let textTertiary = Color.white.opacity(0.35)
-    
+    static let textPrimary     = Color.white
+    static let textSecondary   = Color.white.opacity(0.6)
+    static let textTertiary    = Color.white.opacity(0.35)
+
     // MARK: - Typography
-    
+
     static func headerFont(_ size: CGFloat = 28) -> Font {
         .system(size: size, weight: .bold, design: .default)
     }
-    
+
     static func titleFont(_ size: CGFloat = 20) -> Font {
         .system(size: size, weight: .semibold, design: .default)
     }
-    
+
     static func bodyFont(_ size: CGFloat = 16) -> Font {
         .system(size: size, weight: .medium, design: .default)
     }
-    
+
     static func captionFont(_ size: CGFloat = 13) -> Font {
         .system(size: size, weight: .regular, design: .default)
     }
-    
-    // MARK: - Spacing
-    
-    static let paddingSmall: CGFloat = 8
-    static let paddingMedium: CGFloat = 16
-    static let paddingLarge: CGFloat = 24
-    
-    // MARK: - Corner Radius
-    
-    static let cornerRadiusSmall: CGFloat = 8
-    static let cornerRadiusMedium: CGFloat = 12
-    static let cornerRadiusLarge: CGFloat = 20
-    
-    // MARK: - Animation
-    
-    static let animationSpring = Animation.spring(response: 0.4, dampingFraction: 0.8)
-    static let animationSmooth = Animation.easeInOut(duration: 0.3)
 
-    /// Snappy press animation for map annotations and icon buttons.
-    static let animationMapTap = Animation.spring(response: 0.2, dampingFraction: 0.6)
+    // MARK: - Spacing
+
+    static let paddingSmall:  CGFloat = 8
+    static let paddingMedium: CGFloat = 16
+    static let paddingLarge:  CGFloat = 24
+
+    // MARK: - Corner Radius
+
+    static let cornerRadiusSmall:  CGFloat = 8
+    static let cornerRadiusMedium: CGFloat = 12
+    static let cornerRadiusLarge:  CGFloat = 20
+
+    // MARK: - Legacy Animations
+
+    /// General-purpose damped spring; retained for pre-Liquid-Glass views.
+    static let animationSpring = Animation.spring(response: 0.4, dampingFraction: 0.8)
+    /// Smooth ease-in-out; retained for pre-Liquid-Glass views.
+    static let animationSmooth = Animation.easeInOut(duration: 0.3)
+    /// Source-compatibility alias — new code should use `Theme.Anim.mapTap`.
+    static let animationMapTap = Anim.mapTap
+
+    // MARK: - UI Layout Constants
+
+    /// Dimension tokens for the Liquid Glass card shell, map annotations,
+    /// and interactive elements throughout the app.
+    enum UI {
+        /// Corner radius of the full-height glass bottom card shell.
+        static let sheetCornerRadius: CGFloat = 38
+        /// Corner radius shared by bento prediction cards and the track button.
+        static let bentoCardCornerRadius: CGFloat = 16
+        /// Bottom padding inside `LiquidBottomCardShell` to clear the home indicator.
+        static let sheetBottomInset: CGFloat = 44
+        /// Horizontal edge padding applied to `LiquidBottomCardShell`.
+        static let sheetHorizontalPadding: CGFloat = 8
+        /// Outer bottom spacing between the card shell and the physical screen edge.
+        static let sheetBottomPadding: CGFloat = 16
+        /// Bottom padding applied to floating route buttons when no info card is visible.
+        static let floatingButtonsBottomPadding: CGFloat = 50
+        /// Minimum downward drag translation (pts) required to trigger sheet dismissal.
+        static let dragDismissThreshold: CGFloat = 80
+        /// Width of the drag handle pill at the top of the stop sheet.
+        static let dragHandleWidth: CGFloat = 40
+        /// Height of the drag handle pill.
+        static let dragHandleHeight: CGFloat = 4
+        /// Diameter of the inner white fill circle on a stop annotation.
+        static let stopMarkerSize: CGFloat = 12
+        /// Width of the route-colored stroke ring on a stop annotation.
+        static let stopMarkerStrokeWidth: CGFloat = 2.5
+        /// Diameter of the bus vehicle marker circle.
+        static let busMarkerSize: CGFloat = 22
+        /// Hit-test frame size for stop map annotations.
+        static let stopAnnotationFrame: CGFloat = 36
+        /// Hit-test frame size for bus vehicle map annotations.
+        static let busAnnotationFrame: CGFloat = 44
+        /// Inner content padding for bento prediction cards.
+        static let bentoCardPadding: CGFloat = 14
+        /// Opacity of the route-color tint passed to `glassEffect` on the card shell.
+        static let glassShellTintOpacity: CGFloat = 0.1
+    }
+
+    // MARK: - Map Constants
+
+    /// Coordinate span and camera-offset tokens for MapKit positioning.
+    enum Map {
+        /// Degree span (latitude and longitude) when the camera zooms to a selected stop.
+        static let closeUpSpan: Double = 0.012
+        /// Fraction of `closeUpSpan` subtracted from the stop's latitude so the pin
+        /// appears in the upper portion of the visible area above the bottom sheet.
+        static let closeUpVerticalOffsetFraction: Double = 0.25
+        /// Static `safeAreaPadding` applied to the Map view at all times.
+        /// A constant value prevents the map frame from resizing when the bottom
+        /// sheet appears, eliminating the iOS 17+ MapKit camera teleport bug.
+        static let bottomPadding: CGFloat = 100
+        /// Degree span used when "Focus Bus" zooms the camera to a vehicle.
+        static let zoomToBusSpan: Double = 0.008
+    }
+
+    // MARK: - Animation Presets
+
+    /// Named `Animation` instances for consistent motion throughout the Liquid Glass UI.
+    enum Anim {
+        /// Spring for stop sheet presentation and selection state changes;
+        /// also drives the top-level `ZStack` animation on `selectedStop`.
+        static let stopSheet = Animation.spring(response: 0.45, dampingFraction: 0.75)
+        /// Spring for snapping the sheet back after an incomplete downward drag.
+        static let dismissSpring = Animation.spring(response: 0.35, dampingFraction: 0.8)
+        /// Fast ease-out for immediate dismiss transitions (drag release, close button tap).
+        static let dismissEaseOut = Animation.easeOut(duration: 0.22)
+        /// Spring for route chip selection in the horizontal scroll strip.
+        static let routeChip = Animation.spring(response: 0.35, dampingFraction: 0.7)
+        /// Smooth ease-in-out for camera fly-to transitions (route framing, stop dismiss).
+        static let cameraFly = Animation.easeInOut(duration: 0.5)
+        /// Slightly slower camera fly when tapping a stop annotation, matching the
+        /// sheet slide-up timing for a more deliberate, cohesive feel.
+        static let stopCameraFly = Animation.easeInOut(duration: 0.6)
+        /// Insertion spring for the floating info card sliding up from the bottom edge.
+        static let infoCardInsertion = Animation.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0)
+        /// Cross-fade when swapping between info card content states (vehicle ↔ stop ↔ route).
+        static let infoCardFade = Animation.easeInOut(duration: 0.15)
+        /// Spring for showing/hiding the bottom overlay stack and info card.
+        static let bottomOverlay = Animation.spring(response: 0.4, dampingFraction: 0.8)
+        /// Visual feedback for annotation and button pressed/selected state changes.
+        static let selectionFeedback = Animation.easeOut(duration: 0.2)
+        /// Snappy spring for MapKit annotation tap press feedback.
+        static let mapTap = Animation.spring(response: 0.2, dampingFraction: 0.6)
+        /// Repeating pulse for the LIVE badge indicator dot.
+        static let liveBadgePulse = Animation.easeInOut(duration: 1).repeatForever(autoreverses: true)
+    }
 }
 
 // MARK: - Map Item Button Style
 
 /// Standard press feedback for non-MapKit buttons (toolbar items, cards, etc.).
-/// MapKit Annotation closures need `mapItemPressEffect()` instead — see below.
+/// Use `mapItemPressEffect()` instead inside MapKit `Annotation` closures.
 struct CABSMapItemButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
             .brightness(configuration.isPressed ? -0.15 : 0)
-            .animation(Theme.animationMapTap, value: configuration.isPressed)
+            .animation(Theme.Anim.mapTap, value: configuration.isPressed)
     }
 }
 
 // MARK: - Map Item Press Modifier
 
-/// Use this instead of `CABSMapItemButtonStyle` inside `Annotation` closures.
+/// Applies persistent press and selection feedback to MapKit `Annotation` views.
 ///
-/// Two problems solved here:
+/// Two constraints this modifier addresses:
 ///
-/// 1. **ButtonStyle.isPressed is swallowed by MapKit.**  MapKit installs a
-///    UIGestureRecognizer on every annotation host view at the UIKit layer,
-///    consuming the touch before SwiftUI's button machinery sees it.  We bypass
-///    this by using `DragGesture(minimumDistance: 0)` with `.simultaneousGesture`
-///    — it fires on raw touch-down/up without competing with MapKit's tap
-///    recogniser, and calling `action()` from `.onEnded` means the tap is
-///    never swallowed.
+/// 1. **`ButtonStyle.isPressed` is consumed by MapKit.** MapKit installs a
+///    `UIGestureRecognizer` on every annotation host at the UIKit layer,
+///    consuming the touch before SwiftUI's button machinery sees it. This modifier
+///    bypasses that by using `DragGesture(minimumDistance: 0)` with
+///    `.simultaneousGesture` — it fires on raw touch-down/up without competing
+///    with MapKit's tap recogniser.
 ///
-/// 2. **Selection state needs to persist.**  The effect is active whenever
-///    `isPressed || isSelected`, so the darkened/scaled-down look stays on the
-///    annotation for as long as it is the current selection — not just during
-///    the instant of the press.
+/// 2. **Selection state must persist beyond the tap instant.** The visual effect
+///    stays active while `isPressed || isSelected`, so the annotation remains
+///    highlighted for the full duration of its selection.
 ///
 /// Usage:
 ///
@@ -113,7 +186,6 @@ struct CABSMapItemButtonStyle: ButtonStyle {
 ///         .mapItemPressEffect(isSelected: viewModel.selectedStop?.id == stop.id) {
 ///             viewModel.selectStop(stop)
 ///         }
-///
 struct MapItemPressEffect: ViewModifier {
     /// Whether this annotation is the currently active/selected item.
     let isSelected: Bool
@@ -127,14 +199,14 @@ struct MapItemPressEffect: ViewModifier {
         return content
             .scaleEffect(active ? 0.96 : 1.0)
             .brightness(active ? -0.15 : 0)
-            .animation(Theme.animationMapTap, value: active)
+            .animation(Theme.Anim.mapTap, value: active)
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in if !isPressed { isPressed = true } }
                     .onEnded { value in
                         isPressed = false
                         // Treat as a tap only when the finger barely moved;
-                        // ignore genuine drags (panning the map).
+                        // ignore genuine map-pan drags.
                         let t = value.translation
                         guard abs(t.width) < 10, abs(t.height) < 10 else { return }
                         action()
@@ -144,8 +216,8 @@ struct MapItemPressEffect: ViewModifier {
 }
 
 extension View {
-    /// Attach persistent press + selection feedback to a MapKit Annotation view.
-    /// The action closure replaces `.onTapGesture` — do not add both.
+    /// Attaches persistent press and selection feedback to a MapKit `Annotation` view.
+    /// The `action` closure replaces `.onTapGesture` — do not combine both.
     func mapItemPressEffect(isSelected: Bool, action: @escaping () -> Void) -> some View {
         modifier(MapItemPressEffect(isSelected: isSelected, action: action))
     }
@@ -160,20 +232,16 @@ extension Color {
         Scanner(string: hex).scanHexInt64(&int)
         let a, r, g, b: UInt64
         switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (255, 0, 0, 0)
+        case 3: (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default: (a, r, g, b) = (255, 0, 0, 0)
         }
         self.init(
             .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue:  Double(b) / 255,
+            red:     Double(r) / 255,
+            green:   Double(g) / 255,
+            blue:    Double(b) / 255,
             opacity: Double(a) / 255
         )
     }

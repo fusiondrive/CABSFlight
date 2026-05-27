@@ -2,19 +2,21 @@
 //  LiquidGlassView.swift
 //  CABSFlight
 //
-//  iOS 26+ "Liquid Glass" design with glossy materials and glowing effects
+//  iOS 26+ Liquid Glass UI with glossy materials and 3D effects.
 //
 
 import SwiftUI
 import MapKit
 
-/// Liquid Glass UI for iOS 26+ with glossy materials and 3D effects
+/// Root view for the iOS 26+ Liquid Glass experience.
+/// Composes the full-screen map, header overlay, floating route buttons,
+/// bus/route info card, and the stop bottom sheet.
 @available(iOS 26, *)
 struct LiquidGlassView: View {
     @Environment(BusViewModel.self) private var viewModel
 
     // Drives the stop-sheet Bento grid when the live API returns no predictions
-    // (nights, weekends, off-season). Started alongside the bus tracker below.
+    // (nights, weekends, off-season). Started alongside the bus tracker in onAppear.
     @State private var mockEngine = CABSMockEngine()
 
     @State private var cameraPosition: MapCameraPosition = .region(
@@ -26,96 +28,97 @@ struct LiquidGlassView: View {
             )
         )
     )
-    
+
     var body: some View {
         ZStack {
-            // MARK: - Map (Full Screen)
-            // Extracted to separate struct to reduce compiler complexity
+            // Map fills the entire screen; extracted to a separate struct to
+            // reduce SwiftUI compiler complexity on this view's body.
             LiquidMapLayer(viewModel: viewModel, cameraPosition: $cameraPosition)
-            
-            // MARK: - Header Overlay (Top)
+
+            // Header overlay (top)
             VStack {
                 LiquidHeaderOverlay(viewModel: viewModel)
                 Spacer()
             }
-            
-            // MARK: - Bottom Overlays (Floating)
+
+            // Bottom overlays — route strip and floating info card
             VStack(spacing: 0) {
                 Spacer()
-                
-                // Route buttons (above card)
+
                 LiquidBottomOverlay(viewModel: viewModel)
                     .zIndex(10)
-                
-                // Info card (floating at bottom)
+
                 if shouldShowInfoCard {
                     LiquidInfoCard(viewModel: viewModel, onFocusBus: zoomToBus)
                         .transition(
                             .asymmetric(
                                 insertion: .move(edge: .bottom).combined(with: .opacity)
-                                    .animation(.spring(response: 0.5, dampingFraction: 0.6, blendDuration: 0)),
+                                    .animation(Theme.Anim.infoCardInsertion),
                                 removal: .move(edge: .bottom).combined(with: .opacity)
-                                    .animation(.easeOut(duration: 0.2))
+                                    .animation(Theme.Anim.selectionFeedback)
                             )
                         )
                 }
             }
-            // Dynamic bottom padding: lift buttons when no card, tight when card shown
-            .padding(.bottom, shouldShowInfoCard ? 0 : 50)
-            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: shouldShowInfoCard)
-            .ignoresSafeArea(.container, edges: .bottom) // Measure from physical screen edge
-            // MARK: - Stop Bottom Sheet
-            // Shown whenever the user taps a stop annotation.  Lives above
-            // everything else (zIndex 30) so it overlays the route buttons.
+            .padding(.bottom, shouldShowInfoCard ? 0 : Theme.UI.floatingButtonsBottomPadding)
+            .animation(Theme.Anim.bottomOverlay, value: shouldShowInfoCard)
+            .ignoresSafeArea(.container, edges: .bottom)
+
+            // Stop bottom sheet — lives at zIndex 30 to overlay the route buttons
+            // whenever the user has a stop selected.
             if viewModel.selectedStop != nil {
                 CABSBottomSheetView(viewModel: viewModel, mockEngine: mockEngine)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(30)
             }
         }
-        .animation(.spring(response: 0.45, dampingFraction: 0.75),
-                   value: viewModel.selectedStop?.id)
+        .animation(Theme.Anim.stopSheet, value: viewModel.selectedStop?.id)
         .onAppear {
             viewModel.startTracking()
-            mockEngine.start()   // keep mock ETAs ticking while the sheet is live
+            mockEngine.start()
         }
         .onDisappear {
             viewModel.stopTracking()
             mockEngine.stop()
         }
     }
-    
+
     // MARK: - Helpers
-    
+
     private func zoomToBus(_ bus: Bus) {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+        withAnimation(Theme.Anim.dismissSpring) {
             viewModel.selectBus(bus)
         }
         let region = MKCoordinateRegion(
             center: bus.coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
+            span: MKCoordinateSpan(
+                latitudeDelta: Theme.Map.zoomToBusSpan,
+                longitudeDelta: Theme.Map.zoomToBusSpan
+            )
         )
-        withAnimation(.easeInOut(duration: 0.5)) {
+        withAnimation(Theme.Anim.cameraFly) {
             cameraPosition = .region(region)
         }
     }
 
     private var shouldShowInfoCard: Bool {
-        // Stop-sheet handles the stop case; show the info card only for
-        // route/vehicle modes so they don't overlap.
+        // The stop sheet handles the selected-stop case; show the info card only
+        // for route/vehicle modes so the two surfaces don't overlap.
         viewModel.selectedRoute != nil && viewModel.selectedStop == nil
     }
 }
 
 // MARK: - Liquid Map Layer
 
+/// Full-screen map layer managing route polylines, stop annotations, and bus markers.
 @available(iOS 26, *)
 struct LiquidMapLayer: View {
     @Bindable var viewModel: BusViewModel
     @Binding var cameraPosition: MapCameraPosition
 
-    /// Default campus-wide overview — mirrors the initial cameraPosition in
-    /// LiquidGlassView so dismissing a stop always returns to the same framing.
+    /// Campus-wide overview used on initial load and after a stop is dismissed.
+    /// Mirrors the `cameraPosition` initial value in `LiquidGlassView` so both
+    /// always restore to the same framing.
     private let campusOverview: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: BusViewModel.osuCenter,
@@ -134,10 +137,13 @@ struct LiquidMapLayer: View {
         }
         .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
-        .safeAreaPadding(.bottom, 100)
-        .ignoresSafeArea() // Map fills entire screen
+        // Static padding keeps the map frame constant at runtime. Dynamic padding
+        // (e.g. sized to sheet height) causes a layout recalculation that triggers
+        // the iOS 17+ MapKit camera teleport bug on every sheet presentation.
+        .safeAreaPadding(.bottom, Theme.Map.bottomPadding)
+        .ignoresSafeArea()
         .onTapGesture {
-            withAnimation(.easeOut(duration: 0.22)) {
+            withAnimation(Theme.Anim.dismissEaseOut) {
                 viewModel.selectedStop = nil
                 viewModel.selectedVehicle = nil
             }
@@ -148,19 +154,21 @@ struct LiquidMapLayer: View {
         .onChange(of: routeCameraKey) { _, _ in
             lockCameraToSelectedRoute()
         }
-        // Map frame is static (safeAreaPadding never changes), so the camera
-        // move fires immediately without any delay or teleport risk.
+        // Because the map frame is static, camera mutations and state mutations
+        // fire on the same render pass with no delay or teleport risk.
         .onChange(of: viewModel.selectedStop) { _, newStop in
             guard newStop == nil else { return }
             if viewModel.selectedRoute != nil {
                 lockCameraToSelectedRoute(animated: true, clearSelection: false)
             } else {
-                withAnimation(.easeInOut(duration: 0.5)) {
+                withAnimation(Theme.Anim.cameraFly) {
                     cameraPosition = campusOverview
                 }
             }
         }
     }
+
+    // MARK: - Map Content
 
     @MapContentBuilder
     private var polylineLayer: some MapContent {
@@ -181,24 +189,23 @@ struct LiquidMapLayer: View {
                     routeColor: viewModel.selectedRoute?.officialColor ?? .red,
                     isSelected: viewModel.selectedStop?.id == stop.id
                 )
-                .frame(width: 36, height: 36)
+                .frame(width: Theme.UI.stopAnnotationFrame, height: Theme.UI.stopAnnotationFrame)
                 .contentShape(Circle())
                 .mapItemPressEffect(isSelected: viewModel.selectedStop?.id == stop.id) {
-                    // Offset the camera center upward so the pin sits in the
-                    // visible top ~60 % of the screen above the 350 pt sheet.
-                    // Padding is now static (100 pt) so the map frame never
-                    // changes — both mutations fire on the same frame without
-                    // causing a MapKit teleport.
-                    let span = 0.012
-                    let offsetLat = stop.coordinate.latitude - (span * 0.25)
+                    // Offset the camera center upward so the pin sits in the visible
+                    // upper ~60% of the screen above the bottom sheet.
+                    // Uses mathematical coordinate offsetting instead of dynamic safe
+                    // area padding to prevent iOS 17+ MapKit render race conditions.
+                    let span = Theme.Map.closeUpSpan
+                    let offsetLat = stop.coordinate.latitude - (span * Theme.Map.closeUpVerticalOffsetFraction)
                     let targetCenter = CLLocationCoordinate2D(
                         latitude: offsetLat,
                         longitude: stop.coordinate.longitude
                     )
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
+                    withAnimation(Theme.Anim.stopSheet) {
                         viewModel.selectStop(stop)
                     }
-                    withAnimation(.easeInOut(duration: 0.6)) {
+                    withAnimation(Theme.Anim.stopCameraFly) {
                         cameraPosition = .region(MKCoordinateRegion(
                             center: targetCenter,
                             span: MKCoordinateSpan(latitudeDelta: span, longitudeDelta: span)
@@ -218,7 +225,7 @@ struct LiquidMapLayer: View {
                     bus: bus,
                     routeColor: viewModel.selectedRoute?.officialColor ?? .red
                 )
-                .frame(width: 44, height: 44)
+                .frame(width: Theme.UI.busAnnotationFrame, height: Theme.UI.busAnnotationFrame)
                 .contentShape(Rectangle())
                 .mapItemPressEffect(isSelected: viewModel.selectedVehicle?.id == bus.id) {
                     if viewModel.selectedVehicle?.id == bus.id {
@@ -232,10 +239,15 @@ struct LiquidMapLayer: View {
         }
     }
 
+    // MARK: - Derived Data
+
     private var routePolylines: [IdentifiablePolyline] {
         guard let route = viewModel.selectedRoute else { return [] }
         return route.patterns.enumerated().map { index, pattern in
-            IdentifiablePolyline(id: "\(route.id)-\(index)", coordinates: PolylineDecoder.decode(pattern.encodedPolyline))
+            IdentifiablePolyline(
+                id: "\(route.id)-\(index)",
+                coordinates: PolylineDecoder.decode(pattern.encodedPolyline)
+            )
         }
     }
 
@@ -243,6 +255,8 @@ struct LiquidMapLayer: View {
         viewModel.selectedRoute?.stops ?? []
     }
 
+    /// A stable string key that changes whenever the selected route's content
+    /// changes shape — used to trigger camera re-framing on route data updates.
     private var routeCameraKey: String {
         guard let route = viewModel.selectedRoute else { return "none" }
         return [
@@ -255,6 +269,8 @@ struct LiquidMapLayer: View {
             route.patterns.last?.id ?? ""
         ].joined(separator: "-")
     }
+
+    // MARK: - Camera Control
 
     private func lockCameraToSelectedRoute(
         animated: Bool = true,
@@ -269,7 +285,7 @@ struct LiquidMapLayer: View {
 
         let mapRect = route.routeLockedMapRect()
         if animated {
-            withAnimation(.easeInOut(duration: 0.5)) {
+            withAnimation(Theme.Anim.cameraFly) {
                 cameraPosition = .rect(mapRect)
             }
         } else {
@@ -280,6 +296,7 @@ struct LiquidMapLayer: View {
 
 // MARK: - Liquid Glass Components
 
+/// Stop annotation marker rendered at each station along the route polyline.
 @available(iOS 26, *)
 struct LiquidStationView: View {
     let routeColor: Color
@@ -289,11 +306,11 @@ struct LiquidStationView: View {
         ZStack {
             Circle()
                 .fill(.white)
-                .frame(width: 12, height: 12)
+                .frame(width: Theme.UI.stopMarkerSize, height: Theme.UI.stopMarkerSize)
             Circle()
-                .stroke(routeColor, lineWidth: 2.5)
-                .frame(width: 12, height: 12)
-            // Glossy highlight
+                .stroke(routeColor, lineWidth: Theme.UI.stopMarkerStrokeWidth)
+                .frame(width: Theme.UI.stopMarkerSize, height: Theme.UI.stopMarkerSize)
+            // Glossy specular highlight
             Circle()
                 .fill(
                     LinearGradient(
@@ -306,11 +323,12 @@ struct LiquidStationView: View {
                 .offset(x: -2, y: -2)
         }
         .scaleEffect(isSelected ? 1.14 : 1.0)
-        .animation(.easeOut(duration: 0.2), value: isSelected)
+        .animation(Theme.Anim.selectionFeedback, value: isSelected)
         .shadow(color: routeColor.opacity(0.4), radius: 4, y: 2)
     }
 }
 
+/// Bus vehicle annotation marker displaying route color and heading direction.
 @available(iOS 26, *)
 struct LiquidBusMarker: View {
     let bus: Bus
@@ -318,10 +336,9 @@ struct LiquidBusMarker: View {
 
     var body: some View {
         ZStack {
-            // Base circle with route color
             Circle()
                 .fill(routeColor)
-                .frame(width: 22, height: 22)
+                .frame(width: Theme.UI.busMarkerSize, height: Theme.UI.busMarkerSize)
 
             // Glossy overlay
             Circle()
@@ -332,14 +349,12 @@ struct LiquidBusMarker: View {
                         endPoint: .center
                     )
                 )
-                .frame(width: 22, height: 22)
+                .frame(width: Theme.UI.busMarkerSize, height: Theme.UI.busMarkerSize)
 
-            // White border with glow
             Circle()
                 .strokeBorder(.white, lineWidth: 2)
-                .frame(width: 22, height: 22)
+                .frame(width: Theme.UI.busMarkerSize, height: Theme.UI.busMarkerSize)
 
-            // Navigation arrow
             Image(systemName: "location.north.fill")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(.white)
@@ -352,10 +367,11 @@ struct LiquidBusMarker: View {
 
 // MARK: - Liquid Bottom Card Shell
 
-/// Single source of truth for the glass card shell used by LiquidInfoCard
-/// and CABSBottomSheetView. Callers supply tintColor and content; this view
-/// owns every layout, glass, shadow, and safe-area modifier so both cards
-/// are pixel-perfect matches.
+/// Single source of truth for the glass card shell appearance.
+///
+/// Both `LiquidInfoCard` and `CABSBottomSheetView` use this as their outer
+/// container. All layout, glass material, shadow, and safe-area modifiers
+/// live here so both surfaces are pixel-perfect matches.
 @available(iOS 26, *)
 struct LiquidBottomCardShell<Content: View>: View {
     let tintColor: Color
@@ -365,33 +381,37 @@ struct LiquidBottomCardShell<Content: View>: View {
         VStack(spacing: 0) {
             content()
         }
-        .padding(.bottom, 44)
+        .padding(.bottom, Theme.UI.sheetBottomInset)
         .glassEffect(
-            .regular.tint(tintColor.opacity(0.1)),
-            in: RoundedRectangle(cornerRadius: 38, style: .continuous)
+            .regular.tint(tintColor.opacity(Theme.UI.glassShellTintOpacity)),
+            in: RoundedRectangle(cornerRadius: Theme.UI.sheetCornerRadius, style: .continuous)
         )
         .shadow(color: .black.opacity(0.15), radius: 15, y: 8)
         .ignoresSafeArea(edges: .bottom)
-        .padding(.horizontal, 8)
-        .padding(.bottom, 16)
+        .padding(.horizontal, Theme.UI.sheetHorizontalPadding)
+        .padding(.bottom, Theme.UI.sheetBottomPadding)
     }
 }
 
+// MARK: - Liquid Info Card
+
+/// Floating card shown when a route or vehicle is selected.
+/// Hidden while the stop sheet is active to prevent overlap.
 @available(iOS 26, *)
 struct LiquidInfoCard: View {
     @Bindable var viewModel: BusViewModel
     var onFocusBus: ((Bus) -> Void)?
-    
-    private var selectedVehicle: Bus? { viewModel.selectedVehicle }
-    private var selectedStop: Stop? { viewModel.selectedStop }
-    private var selectedRoute: Route? { viewModel.selectedRoute }
+
+    private var selectedVehicle: Bus?   { viewModel.selectedVehicle }
+    private var selectedStop:    Stop?  { viewModel.selectedStop }
+    private var selectedRoute:   Route? { viewModel.selectedRoute }
+
     private var statusTitle: String {
         if selectedVehicle != nil { return "VEHICLE" }
-        if selectedStop != nil { return "STATION" }
+        if selectedStop    != nil { return "STATION" }
         return "ROUTE"
     }
-    
-    /// Route color for glow effect
+
     private var routeColor: Color { viewModel.selectedRoute?.officialColor ?? .blue }
 
     var body: some View {
@@ -413,8 +433,8 @@ struct LiquidInfoCard: View {
                     }
                 }
 
-                // Group + .id forces SwiftUI to swap views instantly instead of
-                // interpolating between them (prevents text overlap/twitching).
+                // `Group + .id` forces SwiftUI to replace the view tree rather than
+                // cross-fade between states, preventing text overlap during transitions.
                 Group {
                     if let bus = selectedVehicle {
                         VStack(alignment: .leading, spacing: 2) {
@@ -497,7 +517,7 @@ struct LiquidInfoCard: View {
                     }
                 }
                 .id(statusTitle + (selectedVehicle?.id ?? "") + (selectedStop?.id ?? ""))
-                .transition(.opacity.animation(.easeInOut(duration: 0.15)))
+                .transition(.opacity.animation(Theme.Anim.infoCardFade))
             }
             .padding(.horizontal, 24)
             .padding(.top, 20)
@@ -505,6 +525,10 @@ struct LiquidInfoCard: View {
     }
 }
 
+// MARK: - Liquid Header Overlay
+
+/// Top-of-screen overlay containing the app title, selected route name,
+/// LIVE badge, and settings button.
 @available(iOS 26, *)
 struct LiquidHeaderOverlay: View {
     @Bindable var viewModel: BusViewModel
@@ -551,27 +575,37 @@ struct LiquidHeaderOverlay: View {
     }
 }
 
+// MARK: - Liquid Live Badge
+
+/// Animated "LIVE" pill shown in the header when real-time bus data is available.
 @available(iOS 26, *)
 struct LiquidLiveBadge: View {
     @State private var isPulsing = false
+
     var body: some View {
         HStack(spacing: 6) {
             Circle().fill(.green).frame(width: 8, height: 8)
-                .scaleEffect(isPulsing ? 1.3 : 1.0).opacity(isPulsing ? 0.6 : 1.0)
+                .scaleEffect(isPulsing ? 1.3 : 1.0)
+                .opacity(isPulsing ? 0.6 : 1.0)
             Text("LIVE").font(.system(size: 13, weight: .semibold)).foregroundColor(.primary.opacity(0.8))
         }
         .padding(.horizontal, 12)
         .frame(height: 40)
         .glassEffect(.regular.interactive(true), in: Capsule())
         .shadow(color: .green.opacity(0.15), radius: 5, y: 2)
-        .onAppear { withAnimation(.easeInOut(duration: 1).repeatForever(autoreverses: true)) { isPulsing = true } }
+        .onAppear {
+            withAnimation(Theme.Anim.liveBadgePulse) { isPulsing = true }
+        }
     }
 }
 
+// MARK: - Liquid Bottom Overlay
+
+/// Floating route selection strip and active-bus count indicator.
 @available(iOS 26, *)
 struct LiquidBottomOverlay: View {
     @Bindable var viewModel: BusViewModel
-    
+
     var body: some View {
         VStack(spacing: 0) {
             if !viewModel.animatedBuses.isEmpty {
@@ -586,7 +620,7 @@ struct LiquidBottomOverlay: View {
                     HStack(spacing: 10) {
                         ForEach(viewModel.routes) { route in
                             LiquidRouteChip(route: route, isSelected: viewModel.selectedRoute?.id == route.id) {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+                                withAnimation(Theme.Anim.routeChip) {
                                     if viewModel.selectedRoute?.id == route.id {
                                         viewModel.deselectRoute()
                                     } else {
@@ -598,42 +632,43 @@ struct LiquidBottomOverlay: View {
                     }
                 }
                 .padding(.horizontal, 20)
-                .padding(.vertical, 30) // Expand height for glow headroom
+                .padding(.vertical, 30) // Expands intrinsic height for glow shadow headroom
             }
-            .padding(.vertical, -18) // Pull back visually
+            .padding(.vertical, -18) // Negative padding resets visual size; extra height is headroom only
         }
-        // No background - buttons float freely on map
+        // No background — chips float freely above the map
     }
 }
 
+// MARK: - Liquid Route Chip
+
+/// Selectable pill for a single transit route in the horizontal route strip.
 @available(iOS 26, *)
 struct LiquidRouteChip: View {
     let route: Route
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                // Dot: White when selected (pops against colored glass), Colored when unselected
+                // Active chips use white to pop against the colored glass tint.
                 Circle()
                     .fill(isSelected ? .white : route.officialColor)
                     .frame(width: 10, height: 10)
                     .shadow(color: isSelected ? .black.opacity(0.2) : .clear, radius: 2, y: 1)
 
-                // Text: White when selected, Secondary when unselected
                 Text(route.id)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(isSelected ? .white : .secondary)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
             .contentShape(Capsule())
-            // Stained glass effect: tinted when selected, plain when not
             .glassEffect(
                 isSelected ? .regular.tint(route.officialColor).interactive(true) : .regular.interactive(true),
                 in: Capsule()
             )
-            // Colored glow when selected (light passing through the gemstone)
+            // Colored glow when selected, simulating light passing through stained glass.
             .shadow(
                 color: isSelected ? route.officialColor.opacity(0.5) : .black.opacity(0.05),
                 radius: isSelected ? 10 : 4,
@@ -641,6 +676,6 @@ struct LiquidRouteChip: View {
             )
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: isSelected)
+        .animation(Theme.Anim.routeChip, value: isSelected)
     }
 }
