@@ -56,9 +56,9 @@ A summary of where the project has moved since the initial prototype:
       <td align="center"><b>Live Bus Tracking</b></td>
     </tr>
     <tr>
-      <td><!-- TODO: Add Dynamic Island screenshot (expanded + compact states) here --><img src="https://github.com/fusiondrive/CABSFlight/tree/main/assets/DynamicIsland.png" alt="Dynamic Island" width="250"></td>
-      <td><!-- TODO: Add Lock Screen Live Activity screenshot here --><img src="https://github.com/fusiondrive/CABSFlight/tree/main/assets/LockScreenLiveActivity.png" alt="Lock Screen Live Activity" width="250"></td>
-      <td><!-- TODO: Add live tracking / map screenshot here --><img src="https://github.com/fusiondrive/CABSFlight/tree/main/assets/LiveTracking.png" alt="Live tracking" width="250"></td>
+      <td><img src="assets/DynamicIsland.png" alt="Dynamic Island" width="250"></td>
+      <td><img src="assets/LockScreenLiveActivity.png" alt="Lock Screen Live Activity" width="250"></td>
+      <td><img src="assets/Livetracking.png" alt="Live tracking" width="250"></td>
     </tr>
   </table>
 </div>
