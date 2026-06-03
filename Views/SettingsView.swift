@@ -48,15 +48,8 @@ struct SettingsView: View {
                     Text("Hidden routes won't appear on the map or in the route bar.")
                 }
 
-                // MARK: - Advanced / Debug
+                // MARK: - Advanced
                 Section("Advanced") {
-                    Button {
-                        viewModel.loadMockData()
-                        dismiss()
-                    } label: {
-                        Label("Load Mock Buses", systemImage: "ladybug.fill")
-                    }
-
                     Button(role: .destructive) {
                         preferences.setVisibleRoutes([])
                         viewModel.applyRouteFilter()

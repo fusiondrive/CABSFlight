@@ -9,7 +9,7 @@ import Foundation
 import CoreLocation
 
 /// Represents a bus stop along a CABS route
-struct Stop: Identifiable, Codable, Equatable {
+struct Stop: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let name: String
     let latitude: Double

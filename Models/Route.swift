@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 /// Represents a CABS bus route (e.g., Campus Loop North)
-struct Route: Identifiable, Codable, Equatable {
+struct Route: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String          // Route code: "CLN", "CLS", "ER", etc.
     let name: String        // Display name: "CAMPUS LOOP NORTH"
     let colorHex: String    // Hex color from API (e.g., "#999999")
@@ -38,7 +38,7 @@ struct Route: Identifiable, Codable, Equatable {
 }
 
 /// Represents a route pattern with encoded polyline for the route path
-struct RoutePattern: Identifiable, Codable, Equatable {
+struct RoutePattern: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let direction: String
     let encodedPolyline: String

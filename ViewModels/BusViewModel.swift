@@ -9,13 +9,15 @@ import Foundation
 import CoreLocation
 import Observation
 
-/// Observable view model for bus tracking with automatic polling
+/// Observable view model for bus tracking with automatic polling.
+/// The data source is fully injectable — pass CABSHybridService (default)
+/// during development or a live implementation for production.
 @Observable
 @MainActor
 final class BusViewModel {
     // MARK: - Public Properties
 
-    /// All routes fetched from API (unfiltered – used by onboarding)
+    /// All routes fetched from the service (unfiltered – used by onboarding)
     private(set) var allRoutes: [Route] = []
 
     /// Filtered routes based on user preferences (displayed in route chips)
@@ -34,16 +36,12 @@ final class BusViewModel {
     var isLoading = false
     var error: String?
 
-    /// When true the production polling loop will discard empty API responses,
-    /// protecting any mock buses loaded via loadMockData() from being wiped.
-    /// Automatically set by loadMockData(); reset by deselectRoute().
-    var mockModeActive: Bool = false
-
     /// Injected user preferences for route visibility filtering
     var userPreferences: UserPreferences?
 
     // MARK: - Private Properties
 
+    private let service: any TransitService
     private var pollingTask: Task<Void, Never>?
     private var animationTask: Task<Void, Never>?
     private var targetBuses: [Bus] = []
@@ -53,7 +51,9 @@ final class BusViewModel {
     private let animationDuration: Double = 0.8
     private let averageCampusSpeed = 5.5 // meters per second
     private let maxReliableCampusSpeed = 15.0 // meters per second; faster samples are treated as GPS jitter
-    private let activeRouteGeofenceDistance = 150.0
+    // Widened from 150 m: real OSU stop spacing (400–600 m) means buses are
+    // legitimately >150 m from the nearest stop mid-segment.
+    private let activeRouteGeofenceDistance = 400.0
     private let averageTimeBetweenStops = 90.0
     private let stationarySpeedThreshold = 1.5
     private let parkedTimeout: TimeInterval = 180
@@ -72,7 +72,15 @@ final class BusViewModel {
 
     // MARK: - Initialization
 
-    init() {}
+    /// Default init uses the hybrid service (real routes + simulated buses).
+    init() {
+        self.service = CABSHybridService()
+    }
+
+    /// Dependency-injection init for testing or service swap.
+    init(service: any TransitService) {
+        self.service = service
+    }
 
     // MARK: - Public Methods
 
@@ -95,7 +103,7 @@ final class BusViewModel {
         animationTask = nil
     }
 
-    /// Select a route and fetch its buses and route details
+    /// Select a route and fetch its buses
     func selectRoute(_ route: Route) {
         selectedRoute = route
         selectedStop = nil
@@ -104,7 +112,6 @@ final class BusViewModel {
         animatedBuses = []
         speedTrackers = [:]
         Task {
-            await fetchRouteDetails(code: route.id)
             await fetchBuses()
         }
     }
@@ -134,7 +141,6 @@ final class BusViewModel {
         buses = []
         animatedBuses = []
         speedTrackers = [:]
-        mockModeActive = false   // re-enable live polling for the next route selection
     }
 
     /// Re-filter `routes` from `allRoutes` using current user preferences.
@@ -159,61 +165,6 @@ final class BusViewModel {
         }
     }
 
-    /// Load mock data for testing (useful when API returns empty at night)
-    func loadMockData() {
-        let mockBuses: [Bus] = [
-            Bus(
-                id: "MOCK-001",
-                routeCode: selectedRoute?.id ?? "CLN",
-                latitude: 40.0020,
-                longitude: -83.0150,
-                heading: 45,
-                speed: 25,
-                destination: "NORTH CAMPUS",
-                delayed: false,
-                patternId: "314",
-                nextStopID: nil,
-                distance: 1500,
-                lastUpdated: Date()
-            ),
-            Bus(
-                id: "MOCK-002",
-                routeCode: selectedRoute?.id ?? "CLN",
-                latitude: 40.0055,
-                longitude: -83.0280,
-                heading: 180,
-                speed: 15,
-                destination: "SOUTH CAMPUS",
-                delayed: false,
-                patternId: "429",
-                nextStopID: nil,
-                distance: 2800,
-                lastUpdated: Date()
-            ),
-            Bus(
-                id: "MOCK-003",
-                routeCode: selectedRoute?.id ?? "CLN",
-                latitude: 39.9985,
-                longitude: -83.0380,
-                heading: 270,
-                speed: 30,
-                destination: "WEST CAMPUS",
-                delayed: true,
-                patternId: "314",
-                nextStopID: nil,
-                distance: 4200,
-                lastUpdated: Date()
-            )
-        ]
-
-        updateSpeedTrackers(with: mockBuses)
-        buses = mockBuses
-        animatedBuses = mockBuses
-        targetBuses = mockBuses
-        // Protect mock positions from being wiped by the next empty API poll.
-        mockModeActive = true
-    }
-
     /// Estimated speed in miles per hour, derived from raw coordinate polling.
     func estimatedSpeedMPH(for bus: Bus) -> Int {
         guard let speed = trackedSpeed(for: bus) else { return 0 }
@@ -227,11 +178,10 @@ final class BusViewModel {
         error = nil
 
         do {
-            allRoutes = try await CABSAPIService.shared.fetchAllRoutes()
+            allRoutes = try await service.fetchRoutes()
             applyRouteFilter()
             if selectedRoute == nil, let first = routes.first {
                 selectedRoute = first
-                await fetchRouteDetails(code: first.id)
                 await fetchBuses()
             }
         } catch {
@@ -241,32 +191,12 @@ final class BusViewModel {
         isLoading = false
     }
 
-    private func fetchRouteDetails(code: String) async {
-        do {
-            let detailedRoute = try await CABSAPIService.shared.fetchRouteDetails(code: code)
-            // Update the selected route with patterns and stops
-            selectedRoute = detailedRoute
-            // Update in allRoutes array
-            if let index = allRoutes.firstIndex(where: { $0.id == code }) {
-                allRoutes[index] = detailedRoute
-            }
-            applyRouteFilter()
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
     private func fetchBuses() async {
         guard let routeCode = selectedRoute?.id else { return }
 
         do {
-            let incomingBuses = try await CABSAPIService.shared.fetchVehicles(routeCode: routeCode)
+            let incomingBuses = try await service.fetchVehicles(routeCode: routeCode)
 
-            // Mock-mode guard: the mock engine owns all bus state while active.
-            // An empty production response must never overwrite simulated positions.
-            if mockModeActive && incomingBuses.isEmpty { return }
-
-            // Live-mode guard: nothing on server + nothing on map → no-op.
             if incomingBuses.isEmpty && buses.isEmpty { return }
 
             let newBuses = spatiallyFilteredVehicles(incomingBuses)
@@ -302,7 +232,7 @@ final class BusViewModel {
                 do {
                     try await Task.sleep(nanoseconds: self?.pollingInterval ?? 3_000_000_000)
                 } catch {
-                    break // Task was cancelled
+                    break
                 }
             }
         }

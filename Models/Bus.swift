@@ -9,7 +9,7 @@ import Foundation
 import CoreLocation
 
 /// Represents a CABS bus vehicle with real-time position data
-struct Bus: Identifiable, Codable, Equatable {
+struct Bus: Identifiable, Codable, Equatable, Hashable, Sendable {
     let id: String
     let routeCode: String
     let latitude: Double
