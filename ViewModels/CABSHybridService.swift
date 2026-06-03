@@ -65,8 +65,7 @@ final class CABSHybridService: TransitService {
         movementTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(3))
-                // Explicit await hops onto the main actor for tick().
-                await self?.tick()
+                self?.tick()
             }
         }
     }
@@ -153,17 +152,28 @@ final class CABSHybridService: TransitService {
 
     func fetchPredictions(stopID: String) async throws -> [Prediction] {
         var predictions: [Prediction] = []
+        let speedMetersPerSecond = 6.7  // ~15 mph campus shuttle speed
 
         for (_, cache) in routeCache {
             guard let stop = cache.route.stops.first(where: { $0.id == stopID }),
                   !cache.path.isEmpty else { continue }
 
-            let stopProgress  = nearestProgress(to: stop.coordinate, in: cache.path)
-            let loopDuration  = 1.0 / cache.stepPerTick * 3.0  // total seconds per loop
+            let stopLoc      = CLLocation(latitude: stop.latitude, longitude: stop.longitude)
+            let stopProgress = nearestProgress(to: stop.coordinate, in: cache.path)
+            let totalLength  = pathLengthMeters(cache.path)
 
             for (busID, state) in busStates where state.routeCode == cache.route.id {
-                let forward        = forwardProgress(from: state.normalizedProgress, to: stopProgress)
-                let arrivalSeconds = forward * loopDuration
+                let busCoord = interpolatedCoordinate(progress: state.normalizedProgress, path: cache.path)
+                let busLoc   = CLLocation(latitude: busCoord.latitude, longitude: busCoord.longitude)
+
+                // Forward-aware distance: a bus that just passed the stop must
+                // travel the rest of the loop before arriving again.
+                let forward = forwardProgress(from: state.normalizedProgress, to: stopProgress)
+                let distanceMeters = forward > 0.01
+                    ? forward * totalLength              // general case: path-trace distance
+                    : busLoc.distance(from: stopLoc)    // near-arrival: straight-line is accurate
+                let arrivalSeconds = distanceMeters / speedMetersPerSecond
+
                 predictions.append(Prediction(
                     id: "\(busID)-\(stopID)",
                     routeCode: cache.route.id,

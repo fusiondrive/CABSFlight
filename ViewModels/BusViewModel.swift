@@ -20,6 +20,10 @@ final class BusViewModel {
     /// All routes fetched from the service (unfiltered – used by onboarding)
     private(set) var allRoutes: [Route] = []
 
+    /// Live service predictions for the currently selected stop. Updated whenever
+    /// a stop is selected and refreshed on every bus polling tick.
+    private(set) var currentStopPredictions: [Prediction] = []
+
     /// Filtered routes based on user preferences (displayed in route chips)
     var routes: [Route] = []
 
@@ -108,6 +112,7 @@ final class BusViewModel {
         selectedRoute = route
         selectedStop = nil
         selectedVehicle = nil
+        currentStopPredictions = []
         buses = []
         animatedBuses = []
         speedTrackers = [:]
@@ -126,6 +131,7 @@ final class BusViewModel {
     func selectStop(_ stop: Stop) {
         selectedStop = stop
         selectedVehicle = nil
+        Task { await refreshStopPredictions() }
     }
 
     /// Clear bus selection
@@ -138,6 +144,7 @@ final class BusViewModel {
         selectedRoute = nil
         selectedStop = nil
         selectedVehicle = nil
+        currentStopPredictions = []
         buses = []
         animatedBuses = []
         speedTrackers = [:]
@@ -217,8 +224,25 @@ final class BusViewModel {
 
             await animateToBuses(newBuses)
 
+            // Refresh stop predictions on every bus tick so ETAs stay current.
+            if selectedStop != nil {
+                await refreshStopPredictions()
+            }
+
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    private func refreshStopPredictions() async {
+        guard let stop = selectedStop else {
+            currentStopPredictions = []
+            return
+        }
+        do {
+            currentStopPredictions = try await service.fetchPredictions(stopID: stop.id)
+        } catch {
+            currentStopPredictions = []
         }
     }
 

@@ -15,10 +15,6 @@ import MapKit
 struct LiquidGlassView: View {
     @Environment(BusViewModel.self) private var viewModel
 
-    // Drives the stop-sheet Bento grid when the live API returns no predictions
-    // (nights, weekends, off-season). Started alongside the bus tracker in onAppear.
-    @State private var mockEngine = CABSMockEngine()
-
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
             center: BusViewModel.osuCenter,
@@ -67,7 +63,7 @@ struct LiquidGlassView: View {
             // Stop bottom sheet — lives at zIndex 30 to overlay the route buttons
             // whenever the user has a stop selected.
             if viewModel.selectedStop != nil {
-                CABSBottomSheetView(viewModel: viewModel, mockEngine: mockEngine)
+                CABSBottomSheetView(viewModel: viewModel)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(30)
             }
@@ -75,11 +71,9 @@ struct LiquidGlassView: View {
         .animation(Theme.Anim.stopSheet, value: viewModel.selectedStop?.id)
         .onAppear {
             viewModel.startTracking()
-            mockEngine.start()
         }
         .onDisappear {
             viewModel.stopTracking()
-            mockEngine.stop()
         }
     }
 

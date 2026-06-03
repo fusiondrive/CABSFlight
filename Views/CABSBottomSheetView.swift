@@ -13,8 +13,6 @@ import ActivityKit
 
 // MARK: - Unified Prediction Model
 
-/// Internal display-only prediction that unifies `ArrivalPrediction` (live API)
-/// and `MockStopPrediction` (CABSMockEngine) so the sheet has a single rendering path.
 private struct SheetPrediction: Identifiable {
     let id: String
     let routeCode: String
@@ -34,10 +32,6 @@ struct CABSBottomSheetView: View {
 
     @Bindable var viewModel: BusViewModel
 
-    /// Shared `CABSMockEngine` instance for simulated ETAs when the live API
-    /// has not yet returned predictions for this stop.
-    var mockEngine: CABSMockEngine? = nil
-
     // MARK: - State Properties
 
     @State private var dragOffset: CGFloat = 0
@@ -47,41 +41,15 @@ struct CABSBottomSheetView: View {
 
     private var stop: Stop? { viewModel.selectedStop }
 
-    /// Unified prediction list — live API results take priority; falls back to
-    /// the mock engine so the sheet is never empty during development or offline.
+    /// Maps the service's live Prediction objects into display-ready SheetPredictions.
     private var predictions: [SheetPrediction] {
-        guard let stop else { return [] }
-
-        let live = viewModel.predictions(for: stop)
-        if !live.isEmpty {
-            return live.prefix(4).map { pred in
-                SheetPrediction(
-                    id: pred.id,
-                    routeCode: pred.route.id,
-                    busLabel: "Bus \(pred.bus.id)",
-                    timeDisplay: pred.timeDisplay,
-                    rawSeconds: pred.rawSeconds,
-                    isDelayed: pred.bus.delayed
-                )
-            }
-        }
-
-        // Fall back to CABSMockEngine data when the live API is unavailable.
-        // Try an exact stop-name match first; if the real stop name doesn't
-        // match the engine's hardcoded names, use the full prediction list so
-        // the Track button is never stuck disabled purely due to a name mismatch.
-        guard let engine = mockEngine else { return [] }
-        let exactMatch = engine.predictions.filter { $0.stopName == stop.name }
-        let source = exactMatch.isEmpty ? Array(engine.predictions) : exactMatch
-        return Array(source.prefix(4)).map { p -> SheetPrediction in
-            let mins = p.timeToArrivalInSeconds / 60
-            let display = p.timeToArrivalInSeconds < 60 ? "Due" : "\(mins) min"
-            return SheetPrediction(
-                id: p.id,
-                routeCode: p.routeCode,
-                busLabel: exactMatch.isEmpty ? "Mock · \(p.routeCode)" : p.routeCode,
-                timeDisplay: display,
-                rawSeconds: Double(p.timeToArrivalInSeconds),
+        viewModel.currentStopPredictions.prefix(4).map { pred in
+            SheetPrediction(
+                id: pred.id,
+                routeCode: pred.routeCode,
+                busLabel: "Bus \(pred.vehicleID)",
+                timeDisplay: pred.timeDisplay,
+                rawSeconds: pred.arrivalSeconds,
                 isDelayed: false
             )
         }
