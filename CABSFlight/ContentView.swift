@@ -27,7 +27,7 @@ struct ContentView: View {
         .onAppear {
             viewModel.userPreferences = preferences
         }
-        .sheet(isPresented: $showOnboarding) {
+        .fullScreenCover(isPresented: $showOnboarding) {
             OnboardingView(viewModel: viewModel, preferences: preferences)
                 .interactiveDismissDisabled()
         }

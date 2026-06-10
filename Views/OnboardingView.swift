@@ -2,7 +2,7 @@
 //  OnboardingView.swift
 //  CABSFlight
 //
-//  First-launch onboarding flow: Welcome → Route picker → Ready.
+//  First-launch onboarding flow inspired by the iOS 26 glass onboarding pattern.
 //
 
 import SwiftUI
@@ -12,248 +12,112 @@ struct OnboardingView: View {
     var preferences: UserPreferences
 
     @Environment(\.dismiss) private var dismiss
-    @State private var currentPage = 0
+    @State private var activePage: Int? = 0
     @State private var selectedRouteIDs: Set<String> = []
 
+    private let pages = OnboardingPage.items
+    private let pageSpring = Animation.interpolatingSpring(stiffness: 170, damping: 22)
+
+    private var pageIndex: Int {
+        min(max(activePage ?? 0, 0), pages.count - 1)
+    }
+
+    private var currentPage: OnboardingPage {
+        pages[pageIndex]
+    }
+
     var body: some View {
-        TabView(selection: $currentPage) {
-            welcomePage.tag(0)
-            chooseRoutesPage.tag(1)
-            readyPage.tag(2)
+        ZStack {
+            OnboardingAmbientBackdrop(page: currentPage)
+
+            VStack(spacing: 0) {
+                OnboardingPagerView(
+                    pages: pages,
+                    activePage: $activePage,
+                    routes: routePreviews,
+                    selectedRouteIDs: selectedRouteIDs,
+                    onToggleRoute: toggleRoute
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                BottomContentView(
+                    page: currentPage,
+                    pageIndex: pageIndex,
+                    pageCount: pages.count,
+                    routeSummary: routeSummary,
+                    continueTitle: pageIndex == pages.count - 1 ? "Start Exploring" : "Continue",
+                    canGoBack: pageIndex > 0,
+                    onBack: goBack,
+                    onContinue: continueForward
+                )
+            }
         }
-        .tabViewStyle(.page(indexDisplayMode: .always))
-        .indexViewStyle(.page(backgroundDisplayMode: .always))
-        .background(Color(hex: "#0A0A0A").ignoresSafeArea())
+        .ignoresSafeArea()
         .preferredColorScheme(.dark)
+        .background(Color.black.ignoresSafeArea())
     }
 
-    // MARK: - Page 1: Welcome
+    // MARK: - Derived Data
 
-    private var welcomePage: some View {
-        VStack(spacing: 24) {
-            Spacer()
+    private var routePreviews: [OnboardingRoutePreview] {
+        if viewModel.allRoutes.isEmpty {
+            return [
+                .init(id: "CLS", name: "Campus Loop South", color: CABSColors.color(for: "CLS"), routeID: nil),
+                .init(id: "CC", name: "Campus Connector", color: CABSColors.color(for: "CC"), routeID: nil),
+                .init(id: "ER", name: "East Residential", color: CABSColors.color(for: "ER"), routeID: nil),
+                .init(id: "MC", name: "Med Center", color: CABSColors.color(for: "MC"), routeID: nil)
+            ]
+        }
 
-            // App Icon – Liquid Glass Style
-            ZStack {
-                // Outer ambient glow
-                RoundedRectangle(cornerRadius: 32, style: .continuous)
-                    .fill(
-                        RadialGradient(
-                            colors: [Theme.accent.opacity(0.3), .clear],
-                            center: .center,
-                            startRadius: 30,
-                            endRadius: 120
-                        )
-                    )
-                    .frame(width: 200, height: 200)
-
-                // Glass body
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [Color(hex: "#1C1C1E"), Color(hex: "#0A0A0A")],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 120, height: 120)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .stroke(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.3), .white.opacity(0.05)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                ),
-                                lineWidth: 1.5
-                            )
-                    )
-                    .overlay(
-                        // Glossy highlight
-                        RoundedRectangle(cornerRadius: 28, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.2), .clear],
-                                    startPoint: .top,
-                                    endPoint: .center
-                                )
-                            )
-                            .padding(2)
-                    )
-                    .shadow(color: Theme.accent.opacity(0.3), radius: 20, y: 10)
-
-                // Bus icon
-                Image(systemName: "bus.fill")
-                    .font(.system(size: 48, weight: .medium))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.white, .white.opacity(0.8)],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .shadow(color: Theme.accent.opacity(0.5), radius: 8, y: 2)
-            }
-
-            VStack(spacing: 12) {
-                Text("Welcome to")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-
-                Text("CABS Flight")
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text("The smoothest way to get around campus.")
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundColor(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-
-            Spacer()
-
-            // Swipe hint
-            HStack(spacing: 6) {
-                Text("Swipe to continue")
-                    .font(.system(size: 14, weight: .medium))
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-            }
-            .foregroundColor(.white.opacity(0.25))
-            .padding(.bottom, 60)
+        return viewModel.allRoutes.map {
+            OnboardingRoutePreview(
+                id: $0.id,
+                name: $0.name.capitalized,
+                color: $0.officialColor,
+                routeID: $0.id
+            )
         }
     }
 
-    // MARK: - Page 2: Choose Routes
-
-    private var chooseRoutesPage: some View {
-        VStack(spacing: 20) {
-            // Header
-            VStack(spacing: 8) {
-                Text("Choose Your Lines")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text("Select the routes you ride.\nYou can always change this later.")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundColor(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.top, 60)
-
-            // Route List
-            ScrollView {
-                VStack(spacing: 12) {
-                    if viewModel.allRoutes.isEmpty {
-                        // Loading state
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .tint(.white)
-                            Text("Loading routes...")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(.white.opacity(0.4))
-                        }
-                        .padding(.top, 40)
-                    } else {
-                        ForEach(viewModel.allRoutes) { route in
-                            OnboardingRouteRow(
-                                route: route,
-                                isSelected: selectedRouteIDs.contains(route.id),
-                                onTap: { toggleRoute(route.id) }
-                            )
-                        }
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 20)
-            }
-
-            // Skip hint
-            Text("Skip to show all routes")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.white.opacity(0.3))
-                .padding(.bottom, 50)
+    private var routeSummary: String {
+        guard pageIndex == 1 else {
+            return currentPage.subtitle
         }
-    }
 
-    // MARK: - Page 3: Ready
-
-    private var readyPage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            // Celebration icon
-            ZStack {
-                Circle()
-                    .fill(Theme.accent.opacity(0.08))
-                    .frame(width: 160, height: 160)
-
-                Circle()
-                    .fill(Theme.accent.opacity(0.15))
-                    .frame(width: 120, height: 120)
-
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 64))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [Theme.accent, Color(hex: "#0055CC")],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .shadow(color: Theme.accent.opacity(0.4), radius: 12, y: 4)
-            }
-
-            VStack(spacing: 12) {
-                Text("All Set!")
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundColor(.white)
-
-                Text(summaryText)
-                    .font(.system(size: 16, weight: .regular))
-                    .foregroundColor(.white.opacity(0.5))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-
-            Spacer()
-
-            // Start Exploring button
-            Button(action: finish) {
-                Text("Start Exploring")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Theme.accent)
-                    )
-                    .shadow(color: Theme.accent.opacity(0.4), radius: 12, y: 6)
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 60)
-        }
-    }
-
-    // MARK: - Helpers
-
-    private var summaryText: String {
         if selectedRouteIDs.isEmpty {
-            return "Your map will show all available routes."
-        } else {
-            let sorted = selectedRouteIDs.sorted()
-            return "Your map is set to show \(sorted.joined(separator: ", "))."
+            return "Leave it open to show every CABS route, or tap the lines you ride most."
+        }
+
+        let sorted = selectedRouteIDs.sorted().joined(separator: ", ")
+        return "\(selectedRouteIDs.count) selected: \(sorted)."
+    }
+
+    // MARK: - Actions
+
+    private func toggleRoute(_ routeID: String?) {
+        guard let routeID else { return }
+
+        withAnimation(pageSpring) {
+            if selectedRouteIDs.contains(routeID) {
+                selectedRouteIDs.remove(routeID)
+            } else {
+                selectedRouteIDs.insert(routeID)
+            }
         }
     }
 
-    private func toggleRoute(_ id: String) {
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            if selectedRouteIDs.contains(id) {
-                selectedRouteIDs.remove(id)
+    private func goBack() {
+        withAnimation(pageSpring) {
+            activePage = max(pageIndex - 1, 0)
+        }
+    }
+
+    private func continueForward() {
+        withAnimation(pageSpring) {
+            if pageIndex < pages.count - 1 {
+                activePage = pageIndex + 1
             } else {
-                selectedRouteIDs.insert(id)
+                finish()
             }
         }
     }
@@ -266,71 +130,554 @@ struct OnboardingView: View {
     }
 }
 
-// MARK: - Route Row Component
+// MARK: - Data
 
-struct OnboardingRouteRow: View {
-    let route: Route
-    let isSelected: Bool
-    let onTap: () -> Void
+private struct OnboardingPage: Identifiable, Hashable {
+    let id: Int
+    let eyebrow: String
+    let title: String
+    let subtitle: String
+    let symbolName: String
+    let tint: Color
+    let glowAnchor: UnitPoint
+
+    static let items: [OnboardingPage] = [
+        .init(
+            id: 0,
+            eyebrow: "LIVE MAP",
+            title: "CABS in Motion",
+            subtitle: "Watch live buses glide across campus with a focused, glass-first map view.",
+            symbolName: "bus.fill",
+            tint: Theme.accent,
+            glowAnchor: .center
+        ),
+        .init(
+            id: 1,
+            eyebrow: "ROUTES",
+            title: "Choose Your Lines",
+            subtitle: "Leave all routes visible or pick only the lines you ride most.",
+            symbolName: "line.3.horizontal.decrease.circle.fill",
+            tint: CABSColors.color(for: "CC"),
+            glowAnchor: .top
+        ),
+        .init(
+            id: 2,
+            eyebrow: "READY",
+            title: "Ready to Roll",
+            subtitle: "Open the map with your route view already tuned for campus travel.",
+            symbolName: "checkmark.circle.fill",
+            tint: Theme.accentSecondary,
+            glowAnchor: .center
+        )
+    ]
+}
+
+private struct OnboardingRoutePreview: Identifiable, Hashable {
+    let id: String
+    let name: String
+    let color: Color
+    let routeID: String?
+}
+
+// MARK: - Pager
+
+private struct OnboardingPagerView: View {
+    let pages: [OnboardingPage]
+    @Binding var activePage: Int?
+    let routes: [OnboardingRoutePreview]
+    let selectedRouteIDs: Set<String>
+    let onToggleRoute: (String?) -> Void
+
+    private var pageIndex: Int {
+        min(max(activePage ?? 0, 0), pages.count - 1)
+    }
 
     var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 14) {
-                // Color dot
-                Circle()
-                    .fill(route.officialColor)
-                    .frame(width: 14, height: 14)
-                    .shadow(color: route.officialColor.opacity(0.4), radius: 4)
-
-                // Route code
-                Text(route.id)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(width: 44, alignment: .leading)
-
-                // Route name
-                Text(route.name)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
-                    .lineLimit(1)
-
-                Spacer()
-
-                // Checkmark circle
-                ZStack {
-                    Circle()
-                        .stroke(
-                            isSelected ? route.officialColor : Color.white.opacity(0.2),
-                            lineWidth: 2
-                        )
-                        .frame(width: 26, height: 26)
-
-                    if isSelected {
-                        Circle()
-                            .fill(route.officialColor)
-                            .frame(width: 26, height: 26)
-
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
-                    }
+        ScrollView(.horizontal) {
+            HStack(spacing: 0) {
+                ForEach(pages) { page in
+                    OnboardingPageContent(
+                        page: page,
+                        isActive: page.id == pageIndex,
+                        routes: routes,
+                        selectedRouteIDs: selectedRouteIDs,
+                        onToggleRoute: onToggleRoute
+                    )
+                    .containerRelativeFrame(.horizontal)
+                    .id(page.id)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(isSelected ? route.officialColor.opacity(0.12) : Color.white.opacity(0.05))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(
-                                isSelected ? route.officialColor.opacity(0.4) : Color.white.opacity(0.08),
-                                lineWidth: 1
-                            )
+            .scrollTargetLayout()
+        }
+        .scrollIndicators(.hidden)
+        .scrollPosition(id: $activePage)
+        .scrollTargetBehavior(.paging)
+        .safeAreaPadding(.top, 24)
+    }
+}
+
+private struct OnboardingPageContent: View {
+    let page: OnboardingPage
+    let isActive: Bool
+    let routes: [OnboardingRoutePreview]
+    let selectedRouteIDs: Set<String>
+    let onToggleRoute: (String?) -> Void
+
+    var body: some View {
+        Group {
+            switch page.id {
+            case 0:
+                AppScreenshotPage(tint: page.tint, isActive: isActive)
+            case 1:
+                RouteSelectionPage(
+                    routes: routes,
+                    selectedRouteIDs: selectedRouteIDs,
+                    onToggleRoute: onToggleRoute
+                )
+            default:
+                AllSetPage(tint: page.tint, isActive: isActive)
+            }
+        }
+        .scaleEffect(isActive ? 1 : 0.9)
+        .opacity(isActive ? 1 : 0.5)
+        .animation(.interpolatingSpring(stiffness: 170, damping: 22), value: isActive)
+    }
+}
+
+// MARK: - Page 1: Framed App Screenshot
+
+private struct AppScreenshotPage: View {
+    let tint: Color
+    let isActive: Bool
+
+    var body: some View {
+        Image("OnboardingInApp")
+            .resizable()
+            .scaledToFit()
+            .padding(.top, 44)
+            .padding(.horizontal, 36)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .shadow(color: tint.opacity(isActive ? 0.35 : 0.12), radius: isActive ? 40 : 18, y: 24)
+            .rotation3DEffect(
+                .degrees(isActive ? 0 : -6),
+                axis: (x: 0, y: 1, z: 0),
+                perspective: 0.6
+            )
+    }
+}
+
+// MARK: - Page 2: Route Selection (Liquid Glass List)
+
+private struct RouteSelectionPage: View {
+    let routes: [OnboardingRoutePreview]
+    let selectedRouteIDs: Set<String>
+    let onToggleRoute: (String?) -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Spacer(minLength: 0)
+
+            ForEach(routes.prefix(6)) { route in
+                Button {
+                    onToggleRoute(route.routeID)
+                } label: {
+                    HStack(spacing: 14) {
+                        Circle()
+                            .fill(route.color)
+                            .frame(width: 14, height: 14)
+                            .shadow(color: route.color.opacity(0.55), radius: 7)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(route.id)
+                                .font(.system(size: 16, weight: .bold))
+                                .foregroundStyle(.white)
+
+                            Text(route.name)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.white.opacity(0.55))
+                                .lineLimit(1)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: isSelected(route) ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(isSelected(route) ? route.color : .white.opacity(0.32))
+                            .contentTransition(.symbolEffect(.replace))
+                    }
+                    .padding(.horizontal, 18)
+                    .frame(height: 60)
+                    .frame(maxWidth: .infinity)
+                    .liquidOnboardingGlass(
+                        in: RoundedRectangle(cornerRadius: 22, style: .continuous),
+                        tint: isSelected(route) ? route.color.opacity(0.24) : .white.opacity(0.04),
+                        interactive: true
                     )
+                }
+                .buttonStyle(OnboardingPressButtonStyle())
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 30)
+    }
+
+    private func isSelected(_ route: OnboardingRoutePreview) -> Bool {
+        guard let routeID = route.routeID else { return selectedRouteIDs.isEmpty }
+        return selectedRouteIDs.contains(routeID)
+    }
+}
+
+// MARK: - Page 3: All Set
+
+private struct AllSetPage: View {
+    let tint: Color
+    let isActive: Bool
+
+    @State private var checkProgress: CGFloat = 0
+    @State private var badgeScale: CGFloat = 0.4
+    @State private var badgeOpacity: Double = 0
+    @State private var pulse = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            ZStack {
+                // Expanding pulse rings
+                ForEach(0..<2, id: \.self) { index in
+                    Circle()
+                        .stroke(tint.opacity(0.5), lineWidth: 1.4)
+                        .frame(width: 150, height: 150)
+                        .scaleEffect(pulse ? 1.55 : 0.85)
+                        .opacity(pulse ? 0 : 0.7)
+                        .animation(
+                            .easeOut(duration: 1.8)
+                                .repeatForever(autoreverses: false)
+                                .delay(Double(index) * 0.9),
+                            value: pulse
+                        )
+                }
+
+                // Ambient glow
+                Circle()
+                    .fill(tint.opacity(0.18))
+                    .frame(width: 190, height: 190)
+                    .blur(radius: 28)
+
+                // Glass plate
+                Circle()
+                    .fill(.clear)
+                    .frame(width: 150, height: 150)
+                    .liquidOnboardingGlass(in: Circle(), tint: tint.opacity(0.16), interactive: true)
+
+                // Check badge with drawn checkmark
+                ZStack {
+                    Circle()
+                        .fill(tint)
+                        .frame(width: 96, height: 96)
+                        .shadow(color: tint.opacity(0.5), radius: 22, y: 10)
+
+                    CheckmarkShape()
+                        .trim(from: 0, to: checkProgress)
+                        .stroke(.black, style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round))
+                        .frame(width: 42, height: 34)
+                }
+                .scaleEffect(badgeScale)
+                .opacity(badgeOpacity)
+            }
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+        .onAppear { if isActive { runEntrance() } }
+        .onChange(of: isActive) { _, nowActive in
+            if nowActive {
+                runEntrance()
+            } else {
+                resetEntrance()
+            }
+        }
+    }
+
+    private func runEntrance() {
+        resetEntrance()
+
+        withAnimation(.interpolatingSpring(stiffness: 190, damping: 16).delay(0.12)) {
+            badgeScale = 1
+            badgeOpacity = 1
+        }
+        withAnimation(.easeOut(duration: 0.5).delay(0.32)) {
+            checkProgress = 1
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            pulse = true
+        }
+    }
+
+    private func resetEntrance() {
+        pulse = false
+        checkProgress = 0
+        badgeScale = 0.4
+        badgeOpacity = 0
+    }
+}
+
+private struct CheckmarkShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.55))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.36, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        return path
+    }
+}
+
+// MARK: - Bottom Content
+
+private struct BottomContentView: View {
+    let page: OnboardingPage
+    let pageIndex: Int
+    let pageCount: Int
+    let routeSummary: String
+    let continueTitle: String
+    let canGoBack: Bool
+    let onBack: () -> Void
+    let onContinue: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            TextContentView(page: page, subtitle: routeSummary)
+
+            IndicatorView(currentIndex: pageIndex, count: pageCount, tint: page.tint)
+
+            HStack(spacing: 12) {
+                if canGoBack {
+                    Button(action: onBack) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 56, height: 56)
+                            .liquidOnboardingGlass(in: Circle(), tint: .white.opacity(0.08), interactive: true)
+                    }
+                    .buttonStyle(OnboardingPressButtonStyle())
+                    .transition(.scale.combined(with: .opacity))
+                }
+
+                Button(action: onContinue) {
+                    HStack(spacing: 9) {
+                        Text(continueTitle)
+                            .font(.system(size: 17, weight: .bold))
+
+                        Image(systemName: pageIndex == pageCount - 1 ? "checkmark" : "arrow.right")
+                            .font(.system(size: 16, weight: .bold))
+                    }
+                    .foregroundStyle(.black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(page.tint, in: Capsule())
+                    .overlay(Capsule().stroke(.white.opacity(0.42), lineWidth: 1))
+                    .shadow(color: page.tint.opacity(0.32), radius: 18, y: 10)
+                }
+                .buttonStyle(OnboardingPressButtonStyle())
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 20)
+        .padding(.bottom, 28)
+        .frame(maxWidth: .infinity)
+        .background {
+            VariableGlassBlur(tint: page.tint)
+        }
+        .animation(.interpolatingSpring(stiffness: 170, damping: 22), value: pageIndex)
+    }
+}
+
+private struct TextContentView: View {
+    let page: OnboardingPage
+    let subtitle: String
+
+    var body: some View {
+        VStack(spacing: 9) {
+            Label(page.eyebrow, systemImage: page.symbolName)
+                .font(.system(size: 13, weight: .bold))
+                .tracking(0.7)
+                .foregroundStyle(page.tint)
+                .id("label-\(page.id)")
+                .contentTransition(.opacity)
+
+            Text(page.title)
+                .font(.system(size: 30, weight: .bold))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .id("title-\(page.id)")
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+
+            Text(subtitle)
+                .font(.system(size: 15, weight: .semibold))
+                .lineSpacing(3)
+                .foregroundStyle(.white.opacity(0.58))
+                .multilineTextAlignment(.center)
+                .frame(minHeight: 40)
+                .padding(.horizontal, 16)
+                .id("subtitle-\(page.id)-\(subtitle)")
+                .contentTransition(.opacity)
+        }
+        .animation(.interpolatingSpring(stiffness: 170, damping: 22), value: page.id)
+        .animation(.easeInOut(duration: 0.18), value: subtitle)
+    }
+}
+
+private struct IndicatorView: View {
+    let currentIndex: Int
+    let count: Int
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<count, id: \.self) { index in
+                Capsule()
+                    .fill(index == currentIndex ? tint : Color.white.opacity(0.22))
+                    .frame(width: index == currentIndex ? 26 : 8, height: 8)
+                    .opacity(index == currentIndex ? 1 : 0.55)
+                    .shadow(color: index == currentIndex ? tint.opacity(0.45) : .clear, radius: 7, y: 2)
+            }
+        }
+        .animation(.interpolatingSpring(stiffness: 170, damping: 22), value: currentIndex)
+    }
+}
+
+private struct VariableGlassBlur: View {
+    let tint: Color
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            tint.opacity(0.22),
+                            tint.opacity(0.08),
+                            .clear
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            .black.opacity(0.08),
+                            .black.opacity(0.56),
+                            .black.opacity(0.84)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            Rectangle()
+                .fill(.white.opacity(0.08))
+                .frame(height: 1)
+                .padding(.horizontal, 42)
+                .padding(.top, 1)
+        }
+        .mask(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 36,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 36,
+                style: .continuous
+            )
+            .ignoresSafeArea(edges: .bottom)
+        )
+        .ignoresSafeArea(edges: .bottom)
+    }
+}
+
+// MARK: - Backdrop
+
+private struct OnboardingAmbientBackdrop: View {
+    let page: OnboardingPage
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(hex: "#020305"),
+                    Color(hex: "#0B0E13"),
+                    Color(hex: "#020305")
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+
+            RadialGradient(
+                colors: [page.tint.opacity(0.24), .clear],
+                center: page.glowAnchor,
+                startRadius: 20,
+                endRadius: 420
+            )
+
+            ForEach(0..<4, id: \.self) { index in
+                Circle()
+                    .fill((index.isMultiple(of: 2) ? page.tint : CABSColors.color(for: "CLS")).opacity(0.1))
+                    .frame(width: CGFloat(180 + index * 72), height: CGFloat(180 + index * 72))
+                    .blur(radius: 48)
+                    .offset(x: CGFloat(index * 86 - 132), y: CGFloat(index * 130 - 210))
+            }
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.72)],
+                startPoint: .top,
+                endPoint: .bottom
             )
         }
-        .buttonStyle(.plain)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+        .animation(.interpolatingSpring(stiffness: 170, damping: 22), value: page.id)
+    }
+}
+
+// MARK: - Micro Components
+
+private struct OnboardingPressButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .brightness(configuration.isPressed ? -0.06 : 0)
+            .animation(.interpolatingSpring(stiffness: 240, damping: 18), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Liquid Glass Helpers
+
+private extension View {
+    @ViewBuilder
+    func liquidOnboardingGlass<S: InsettableShape>(
+        in shape: S,
+        tint: Color = .clear,
+        interactive: Bool = false
+    ) -> some View {
+        if #available(iOS 26, *) {
+            if interactive {
+                self.glassEffect(.regular.tint(tint).interactive(true), in: shape)
+            } else {
+                self.glassEffect(.regular.tint(tint), in: shape)
+            }
+        } else {
+            self
+                .background(
+                    shape
+                        .fill(.ultraThinMaterial)
+                        .overlay(shape.fill(tint.opacity(0.6)))
+                        .overlay(shape.stroke(.white.opacity(0.14), lineWidth: 0.8))
+                )
+        }
     }
 }
