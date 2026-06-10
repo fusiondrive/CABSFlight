@@ -42,13 +42,23 @@ A summary of where the project has moved since the initial prototype:
   <table>
     <tr>
       <td align="center"><b>Onboarding Experience</b></td>
-      <td align="center"><b>Dynamic Backgrounds</b></td>
-      <td align="center"><b>In-App Interface</b></td>
+      <td align="center"><b>Route Picker</b></td>
+      <td align="center"><b>Onboarding Complete</b></td>
     </tr>
     <tr>
-      <td><img src="https://fusiondrive.github.io/assets/CABSF/boarding1.png" alt="Onboarding 1" width="250"></td>
-      <td><img src="https://fusiondrive.github.io/assets/CABSF/boarding2.png" alt="Onboarding 2" width="250"></td>
-      <td><img src="https://fusiondrive.github.io/assets/CABSF/inapp.png" alt="In-App View" width="250"></td>
+      <td><img src="assets/Boarding1.png" alt="Onboarding 1" width="250"></td>
+      <td><img src="assets/Boarding2.png" alt="Route Picker" width="250"></td>
+      <td><img src="assets/BoardingDone.png" alt="Onboarding Complete" width="250"></td>
+    </tr>
+    <tr>
+      <td align="center"><b>In-App Interface</b></td>
+      <td align="center"><b>Live Map Overview</b></td>
+      <td align="center"></td>
+    </tr>
+    <tr>
+      <td><img src="assets/inapp.png" alt="In-App View" width="250"></td>
+      <td><img src="assets/Overall.png" alt="Live Map Overview" width="250"></td>
+      <td></td>
     </tr>
     <tr>
       <td align="center"><b>Dynamic Island (Expanded / Compact)</b></td>
@@ -58,7 +68,7 @@ A summary of where the project has moved since the initial prototype:
     <tr>
       <td><img src="assets/DynamicIsland.png" alt="Dynamic Island" width="250"></td>
       <td><img src="assets/LockScreenLiveActivity.png" alt="Lock Screen Live Activity" width="250"></td>
-      <td><img src="assets/Livetracking.png" alt="Live tracking" width="250"></td>
+      <td><img src="assets/Prediction.png" alt="Live tracking" width="250"></td>
     </tr>
   </table>
 </div>
