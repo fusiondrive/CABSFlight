@@ -32,9 +32,35 @@ struct CABSBottomSheetView: View {
 
     @Bindable var viewModel: BusViewModel
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     // MARK: - State Properties
 
+    /// Vertical translation of the card. Owns the card's on-screen position
+    /// through both the live drag *and* the release animation, so there is no
+    /// snap-back-then-animate seam. Deliberately `@State` (not `@GestureState`)
+    /// because a `@GestureState` resets the instant the finger lifts, which
+    /// would erase the position the release spring needs to animate from.
     @State private var dragOffset: CGFloat = 0
+
+    /// Measured height of the card, used to send it fully off-screen on
+    /// dismissal and to normalize the release velocity for the spring.
+    @State private var panelHeight: CGFloat = 0
+
+    /// Bumped whenever the selection changes. An in-flight interactive-dismiss
+    /// completion checks this before clearing `selectedStop`, so re-selecting a
+    /// stop mid-dismiss can never close the freshly opened sheet.
+    @State private var dismissGeneration = 0
+
+    /// True only while a drag is physically in progress. Auto-resets via
+    /// `@GestureState`, so if the system cancels the drag without an `onEnded`
+    /// (the classic "stuck offset" bug) `onChange` snaps the card back.
+    @GestureState private var isDragging = false
+
+    /// Set by `onEnded` so the `isDragging → false` safety net knows a release
+    /// was already handled and must not fight the dismiss/settle it started.
+    @State private var didHandleRelease = false
+
     private let manager = CABSLiveActivityManager.shared
 
     // MARK: - Derived Data
@@ -75,9 +101,30 @@ struct CABSBottomSheetView: View {
             panel
         }
         .ignoresSafeArea(edges: .bottom)
-        .onChange(of: viewModel.selectedStop?.id) {
-            // Reset drag position whenever the user selects a different stop.
-            dragOffset = 0
+        .onChange(of: viewModel.selectedStop?.id) { _, newID in
+            // Invalidate any pending interactive-dismiss completion.
+            dismissGeneration += 1
+
+            // Only a switch to *another* stop (card stays mounted) returns the
+            // offset to rest, and it animates rather than snapping. On a real
+            // dismissal (newID == nil) the view unmounts, so we leave dragOffset
+            // exactly where it is — the exit animates from the current position
+            // and the next presentation remounts fresh at 0. This is what
+            // removes the old "jump back up, then slide out" artifact.
+            guard newID != nil else { return }
+            withAnimation(Theme.Anim.sheetSettle) { dragOffset = 0 }
+        }
+        .onChange(of: isDragging) { _, dragging in
+            guard !dragging else { return }
+            // Safety net: a drag that ends without `onEnded` (system cancel)
+            // must not leave the card parked mid-screen. If `onEnded` already
+            // ran, it set `didHandleRelease` and started its own animation —
+            // don't fight it.
+            if didHandleRelease {
+                didHandleRelease = false
+            } else if dragOffset != 0 {
+                settle(initialVelocity: 0)
+            }
         }
     }
 
@@ -95,8 +142,19 @@ struct CABSBottomSheetView: View {
             .padding(.horizontal, 20)
             .padding(.top, 4)
         }
-        .offset(y: max(0, dragOffset))
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { panelHeight = $0 }
+        .offset(y: dragOffset)
+        .opacity(panelOpacity)
         .gesture(dismissGesture)
+    }
+
+    /// Subtle fade as the card slides off, so the silent unmount at the end of
+    /// an interactive dismiss is imperceptible. Stays near-opaque during normal
+    /// dragging so the card doesn't wash out under the finger.
+    private var panelOpacity: Double {
+        guard panelHeight > 0, dragOffset > 0 else { return 1 }
+        let progress = min(dragOffset / panelHeight, 1)
+        return 1 - Double(progress) * 0.6
     }
 
     // MARK: - Drag Handle
@@ -128,9 +186,7 @@ struct CABSBottomSheetView: View {
             Spacer()
 
             Button {
-                withAnimation(Theme.Anim.dismissEaseOut) {
-                    viewModel.selectedStop = nil
-                }
+                dismissDiscretely()
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 28))
@@ -235,24 +291,103 @@ struct CABSBottomSheetView: View {
 
     // MARK: - Dismiss Gesture
 
+    /// Drag-to-dismiss. Tracks the finger 1:1 downward, rubber-bands upward past
+    /// rest, and on release decides dismiss vs. settle from momentum
+    /// (`predictedEndTranslation`) and velocity — never a fixed distance.
     private var dismissGesture: some Gesture {
-        DragGesture()
+        DragGesture(minimumDistance: 8, coordinateSpace: .local)
+            .updating($isDragging) { _, state, _ in state = true }
             .onChanged { value in
-                if value.translation.height > 0 {
-                    dragOffset = value.translation.height
-                }
+                dragOffset = resistedOffset(value.translation.height)
             }
             .onEnded { value in
-                if value.translation.height > Theme.UI.dragDismissThreshold {
-                    withAnimation(Theme.Anim.dismissEaseOut) {
-                        viewModel.selectedStop = nil
-                    }
+                didHandleRelease = true
+                let translation = value.translation.height
+                let velocity = value.velocity.height
+                let projectedEnd = value.predictedEndTranslation.height
+
+                // Momentum-based intent: a flick projects far even from a short
+                // drag; a slow 60 pt drag projects ~60 pt and stays. A minimum
+                // real travel guards against an accidental fast twitch.
+                let projectedFarEnough = projectedEnd > Theme.UI.sheetDismissProjection
+                let flicked = velocity > Theme.UI.sheetFlickVelocity
+                let movedEnough = translation > Theme.UI.sheetMinDismissTravel
+
+                if (projectedFarEnough || flicked) && movedEnough {
+                    dismissInteractively(releaseVelocity: velocity)
                 } else {
-                    withAnimation(Theme.Anim.dismissSpring) {
-                        dragOffset = 0
-                    }
+                    settle(initialVelocity: velocity)
                 }
             }
+    }
+
+    // MARK: - Dismiss / Settle
+
+    /// Discrete (non-gesture) dismissal — close button. The removal transition
+    /// (owned by `sheetTransition` in `LiquidGlassView`) plays with the single
+    /// `sheetDismiss` / `sheetReduced` transaction; no offset animation.
+    private func dismissDiscretely() {
+        dismissGeneration += 1
+        withAnimation(reduceMotion ? Theme.Anim.sheetReduced : Theme.Anim.sheetDismiss) {
+            viewModel.selectedStop = nil
+        }
+    }
+
+    /// Interactive dismissal continuing the finger's motion. Reduce Motion
+    /// skips the spatial slide and falls back to the discrete fade.
+    private func dismissInteractively(releaseVelocity: CGFloat) {
+        guard !reduceMotion else {
+            dismissDiscretely()
+            return
+        }
+
+        dismissGeneration += 1
+        let generation = dismissGeneration
+        let dismissingID = stop?.id
+        let target = panelHeight > 0 ? panelHeight : 600
+
+        // Hand the release velocity straight to the spring (normalized by the
+        // remaining distance) so the card continues at the finger's speed —
+        // no seam between drag and animation.
+        let remaining = max(target - dragOffset, 1)
+        let normalizedVelocity = Double(releaseVelocity / remaining)
+
+        withAnimation(Theme.Anim.sheetRelease(initialVelocity: normalizedVelocity)) {
+            dragOffset = target
+        } completion: {
+            // The card is off-screen and faded; unmount silently (no transition
+            // transaction). Guard against a re-selection during the slide.
+            guard generation == dismissGeneration,
+                  viewModel.selectedStop?.id == dismissingID else { return }
+            viewModel.selectedStop = nil
+        }
+    }
+
+    /// Return the card to rest, carrying the release velocity into the spring.
+    private func settle(initialVelocity: CGFloat) {
+        let normalizedVelocity = dragOffset > 0
+            ? Double(-initialVelocity / max(dragOffset, 1))
+            : 0
+        let animation = reduceMotion
+            ? Theme.Anim.sheetReduced
+            : Theme.Anim.sheetRelease(initialVelocity: normalizedVelocity)
+        withAnimation(animation) { dragOffset = 0 }
+    }
+
+    // MARK: - Drag Geometry
+
+    /// Downward drags track the finger 1:1; upward drags past the resting
+    /// position meet progressive rubber-band resistance instead of a hard stop.
+    private func resistedOffset(_ raw: CGFloat) -> CGFloat {
+        guard raw < 0 else { return raw }
+        let dimension = panelHeight > 0 ? panelHeight : 600
+        return -rubberband(-raw, dimension: dimension)
+    }
+
+    /// Apple's rubber-band curve: the further past the bound, the less the card
+    /// follows (see `Designing Fluid Interfaces`, WWDC 2018).
+    private func rubberband(_ overshoot: CGFloat, dimension: CGFloat, constant: CGFloat = 0.55) -> CGFloat {
+        (overshoot * dimension * constant) / (dimension + constant * overshoot)
     }
 
     // MARK: - Tracking Helper

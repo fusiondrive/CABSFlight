@@ -68,8 +68,16 @@ enum Theme {
         static let sheetBottomPadding: CGFloat = 16
         /// Bottom padding applied to floating route buttons when no info card is visible.
         static let floatingButtonsBottomPadding: CGFloat = 50
-        /// Minimum downward drag translation (pts) required to trigger sheet dismissal.
-        static let dragDismissThreshold: CGFloat = 80
+        /// Projected end-translation (pts) past which a downward sheet drag
+        /// commits to dismissal. Uses `predictedEndTranslation` (momentum), so a
+        /// flick dismisses early while a slow 60 pt drag settles back.
+        static let sheetDismissProjection: CGFloat = 150
+        /// Downward release velocity (pts/s) that dismisses regardless of
+        /// distance — a fast flick.
+        static let sheetFlickVelocity: CGFloat = 900
+        /// Minimum actual downward travel (pts) before any dismissal is allowed,
+        /// so an accidental fast twitch can't close the sheet.
+        static let sheetMinDismissTravel: CGFloat = 20
         /// Width of the drag handle pill at the top of the stop sheet.
         static let dragHandleWidth: CGFloat = 40
         /// Height of the drag handle pill.
@@ -111,13 +119,34 @@ enum Theme {
 
     /// Named `Animation` instances for consistent motion throughout the Liquid Glass UI.
     enum Anim {
-        /// Spring for stop sheet presentation and selection state changes;
-        /// also drives the top-level `ZStack` animation on `selectedStop`.
-        static let stopSheet = Animation.spring(response: 0.45, dampingFraction: 0.75)
-        /// Spring for snapping the sheet back after an incomplete downward drag.
-        static let dismissSpring = Animation.spring(response: 0.35, dampingFraction: 0.8)
-        /// Fast ease-out for immediate dismiss transitions (drag release, close button tap).
-        static let dismissEaseOut = Animation.easeOut(duration: 0.22)
+        // MARK: Stop bottom sheet
+        //
+        // Single-ownership model: the sheet's `.transition` defines *how* it
+        // enters/leaves; exactly one transaction below defines the *timing* for
+        // each interaction. No call-site stacks a second animation on the same
+        // change.
+
+        /// Presentation of the stop sheet (tap a stop). Owns the insertion.
+        static let sheetPresent = Animation.spring(response: 0.42, dampingFraction: 0.82)
+        /// Discrete, non-gesture dismissal — close button, map tap, route
+        /// switch. Owns the removal transition.
+        static let sheetDismiss = Animation.spring(response: 0.34, dampingFraction: 0.9)
+        /// Non-velocity reposition of the sheet to rest, e.g. returning the
+        /// drag offset to 0 when the user switches to a different stop.
+        static let sheetSettle = Animation.spring(response: 0.4, dampingFraction: 0.85)
+        /// Reduced-motion replacement for every sheet spring: a short opacity
+        /// crossfade with no spatial spring.
+        static let sheetReduced = Animation.easeOut(duration: 0.2)
+
+        /// Velocity-carrying spring for an interactive drag release (settle-back
+        /// or dismiss). `initialVelocity` is the release velocity normalized by
+        /// the remaining distance, handing the finger's momentum straight to the
+        /// spring so there's no seam between drag and animation. Critically
+        /// damped-ish (no overshoot) — a sheet shouldn't bounce.
+        static func sheetRelease(initialVelocity: Double) -> Animation {
+            .interpolatingSpring(stiffness: 300, damping: 30, initialVelocity: initialVelocity)
+        }
+
         /// Spring for route chip selection in the horizontal scroll strip.
         static let routeChip = Animation.spring(response: 0.35, dampingFraction: 0.7)
         /// Smooth ease-in-out for camera fly-to transitions (route framing, stop dismiss).

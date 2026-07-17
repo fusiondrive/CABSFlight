@@ -14,6 +14,7 @@ import MapKit
 @available(iOS 26, *)
 struct LiquidGlassView: View {
     @Environment(BusViewModel.self) private var viewModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var cameraPosition: MapCameraPosition = .region(
         MKCoordinateRegion(
@@ -62,13 +63,20 @@ struct LiquidGlassView: View {
 
             // Stop bottom sheet — lives at zIndex 30 to overlay the route buttons
             // whenever the user has a stop selected.
+            //
+            // Single animation owner: this `.transition` defines *how* the sheet
+            // enters/leaves; the *timing* comes solely from the transaction at
+            // the mutation site (sheetPresent on open, sheetDismiss on discrete
+            // close, sheetRelease on interactive drag). There is deliberately no
+            // container-level `.animation(value:)` here — one used to override
+            // every call-site transaction, which is exactly the conflict this
+            // phase removes. Reduce Motion drops the spatial move for a fade.
             if viewModel.selectedStop != nil {
                 CABSBottomSheetView(viewModel: viewModel)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(sheetTransition)
                     .zIndex(30)
             }
         }
-        .animation(Theme.Anim.stopSheet, value: viewModel.selectedStop?.id)
         .onAppear {
             viewModel.startTracking()
         }
@@ -77,10 +85,19 @@ struct LiquidGlassView: View {
         }
     }
 
+    /// Enter/exit transition for the stop sheet. Reduce Motion swaps the
+    /// upward slide for a plain opacity crossfade (no vestibular motion).
+    private var sheetTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .move(edge: .bottom).combined(with: .opacity)
+    }
+
     // MARK: - Helpers
 
     private func zoomToBus(_ bus: Bus) {
-        withAnimation(Theme.Anim.dismissSpring) {
+        // Focusing a bus swaps the info-card content; use the info-card owner.
+        withAnimation(Theme.Anim.bottomOverlay) {
             viewModel.selectBus(bus)
         }
         let region = MKCoordinateRegion(
@@ -138,7 +155,10 @@ struct LiquidMapLayer: View {
         .safeAreaPadding(.bottom, Theme.Map.bottomPadding)
         .ignoresSafeArea()
         .onTapGesture {
-            withAnimation(Theme.Anim.dismissEaseOut) {
+            // Discrete dismissal — single owner is sheetDismiss (drives the
+            // removal transition). selectedVehicle clears in the same
+            // transaction; the info card has its own scoped animation owner.
+            withAnimation(Theme.Anim.sheetDismiss) {
                 viewModel.selectedStop = nil
                 viewModel.selectedVehicle = nil
             }
@@ -197,7 +217,8 @@ struct LiquidMapLayer: View {
                         latitude: offsetLat,
                         longitude: stop.coordinate.longitude
                     )
-                    withAnimation(Theme.Anim.stopSheet) {
+                    // Single owner for presentation.
+                    withAnimation(Theme.Anim.sheetPresent) {
                         viewModel.selectStop(stop)
                     }
                     withAnimation(Theme.Anim.stopCameraFly) {
