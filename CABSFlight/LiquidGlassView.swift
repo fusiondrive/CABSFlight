@@ -110,6 +110,13 @@ struct LiquidMapLayer: View {
     @Bindable var viewModel: BusViewModel
     @Binding var cameraPosition: MapCameraPosition
 
+    #if DEBUG
+    // Phase 1 technical probe (debug builds only) — see `MapMotionProbe` at
+    // the bottom of this file. Delete once the bus-motion architecture is decided.
+    @State private var probeA = MapMotionProbe(retargetInterval: 4.0, latitudeOffset: 0.006)
+    @State private var probeB = MapMotionProbe(retargetInterval: 2.0, latitudeOffset: -0.006)
+    #endif
+
     /// Campus-wide overview used on initial load and after a stop is dismissed.
     /// Mirrors the `cameraPosition` initial value in `LiquidGlassView` so both
     /// always restore to the same framing.
@@ -128,7 +135,20 @@ struct LiquidMapLayer: View {
             polylineLayer
             stopLayer
             busLayer
+            #if DEBUG
+            probeLayer
+            #endif
         }
+        #if DEBUG
+        // `.task` is cancelled automatically when the map disappears, so the
+        // probes stop without any manual lifecycle management.
+        .task {
+            guard MapMotionProbe.enabled else { return }
+            async let a: Void = probeA.run()
+            async let b: Void = probeB.run()
+            _ = await (a, b)
+        }
+        #endif
         .mapStyle(.standard(elevation: .realistic, pointsOfInterest: .excludingAll))
         .mapControlVisibility(.hidden)
         // Static padding keeps the map frame constant at runtime. Dynamic padding
@@ -210,6 +230,20 @@ struct LiquidMapLayer: View {
             }
         }
     }
+
+    #if DEBUG
+    @MapContentBuilder
+    private var probeLayer: some MapContent {
+        if MapMotionProbe.enabled {
+            Annotation("", coordinate: probeA.coordinate) {
+                MapMotionProbeView(label: "A", tint: .green, heading: probeA.heading)
+            }
+            Annotation("", coordinate: probeB.coordinate) {
+                MapMotionProbeView(label: "B", tint: .purple, heading: probeB.heading)
+            }
+        }
+    }
+    #endif
 
     @MapContentBuilder
     private var busLayer: some MapContent {
@@ -633,6 +667,107 @@ struct LiquidBottomOverlay: View {
         // No background — chips float freely above the map
     }
 }
+
+#if DEBUG
+// MARK: - Phase 1 Probe: MapKit coordinate animation verification
+//
+// Purpose: verify — by observation, not API intuition — whether SwiftUI
+// `withAnimation` transactions are honored by MapKit `Annotation` coordinate
+// changes on this SDK, before replacing the hand-written 60 fps interpolation
+// loop in `BusViewModel.animateToBuses`.
+//
+// Two probes orbit small diamonds near campus center:
+//   • Probe A (green): retargets every 4 s with a 3 s linear animation.
+//     Expected if MapKit honors the transaction: continuous glide, ~1 s rest.
+//     Failure mode: instant teleport every 4 s.
+//   • Probe B (purple): retargets every 2 s with the same 3 s animation, so
+//     every animation is interrupted mid-flight.
+//     Expected: motion continues smoothly from the *currently presented*
+//     position toward the new target. Failure modes: jump back to the previous
+//     target before continuing, or a visible velocity discontinuity.
+//
+// The heading arrow intentionally animates the RAW degree value across the
+// 350° → 10° wrap, to demonstrate the long-way spin that Phase 1 must fix
+// with continuous-angle unwrapping (do NOT copy this heading handling).
+//
+// Also observe, while probes are moving: map pan/zoom (no teleport or
+// transaction conflicts), backgrounding and returning, and route switching.
+//
+// Delete this entire section once the architecture decision is made.
+
+/// Drives one probe annotation. `@Observable` so only the annotations reading
+/// `coordinate`/`heading` re-render — the pattern candidate for Phase 1.
+@available(iOS 26, *)
+@Observable
+@MainActor
+final class MapMotionProbe {
+    /// Master switch for the probes (debug builds only).
+    static let enabled = true
+
+    private(set) var coordinate: CLLocationCoordinate2D
+    private(set) var heading: Double
+
+    private let retargetInterval: TimeInterval
+    private let waypoints: [CLLocationCoordinate2D]
+    /// Crosses 0° between consecutive values to expose wrap-around behavior.
+    private let headings: [Double] = [350, 10, 100, 250]
+    private var index = 0
+
+    init(retargetInterval: TimeInterval, latitudeOffset: Double) {
+        let center = BusViewModel.osuCenter
+        let d = 0.004
+        self.waypoints = [
+            CLLocationCoordinate2D(latitude: center.latitude + latitudeOffset, longitude: center.longitude - d),
+            CLLocationCoordinate2D(latitude: center.latitude + latitudeOffset + d, longitude: center.longitude),
+            CLLocationCoordinate2D(latitude: center.latitude + latitudeOffset, longitude: center.longitude + d),
+            CLLocationCoordinate2D(latitude: center.latitude + latitudeOffset - d, longitude: center.longitude)
+        ]
+        self.retargetInterval = retargetInterval
+        self.coordinate = waypoints[0]
+        self.heading = headings[0]
+    }
+
+    func run() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(retargetInterval))
+            guard !Task.isCancelled else { return }
+            index = (index + 1) % waypoints.count
+            withAnimation(.linear(duration: 3)) {
+                coordinate = waypoints[index]
+                heading = headings[index % headings.count]
+            }
+        }
+    }
+}
+
+/// Visual for a probe annotation: labeled circle + heading arrow.
+@available(iOS 26, *)
+struct MapMotionProbeView: View {
+    let label: String
+    let tint: Color
+    let heading: Double
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(tint)
+                .frame(width: 26, height: 26)
+            Circle()
+                .strokeBorder(.white, lineWidth: 2)
+                .frame(width: 26, height: 26)
+            Text(label)
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundColor(.white)
+            Image(systemName: "arrowtriangle.up.fill")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundColor(tint)
+                .offset(y: -20)
+                .rotationEffect(.degrees(heading))
+        }
+        .shadow(color: tint.opacity(0.6), radius: 5, y: 2)
+    }
+}
+#endif
 
 // MARK: - Liquid Route Chip
 
