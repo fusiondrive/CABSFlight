@@ -13,12 +13,18 @@ struct ContentView: View {
     @State private var viewModel = BusViewModel()
     @State private var preferences = UserPreferences()
     @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         LiquidGlassView()
             .environment(viewModel)
             .onAppear {
                 viewModel.userPreferences = preferences
+            }
+            // Single lifecycle owner: polling suspends in the background and
+            // resumes (with an immediate fetch) on return to foreground.
+            .onChange(of: scenePhase) { _, newPhase in
+                viewModel.scenePhaseChanged(to: newPhase)
             }
             .fullScreenCover(isPresented: $showOnboarding) {
                 OnboardingView(viewModel: viewModel, preferences: preferences)

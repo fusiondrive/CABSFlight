@@ -98,7 +98,9 @@ actor CABSAPIService {
                 routeCode: routeCode,
                 latitude: lat,
                 longitude: lng,
-                heading: Double(vehicle.heading ?? 0),
+                // The API's `heading` is optional; preserve absence instead of
+                // collapsing it to 0 (0° is a valid northbound heading).
+                heading: vehicle.heading.map(Double.init),
                 speed: vehicle.speed ?? 0,
                 destination: vehicle.destination,
                 delayed: vehicle.delayed ?? false,

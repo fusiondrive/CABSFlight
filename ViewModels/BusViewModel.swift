@@ -8,6 +8,8 @@
 import Foundation
 import CoreLocation
 import Observation
+import SwiftUI
+import UIKit
 
 /// Observable view model for bus tracking with automatic polling.
 /// The data source is fully injectable — pass CABSHybridService (default)
@@ -34,9 +36,21 @@ final class BusViewModel {
         get { selectedBus }
         set { selectedBus = newValue }
     }
-    var vehicles: [Bus] { buses.isEmpty ? animatedBuses : buses }
-    var buses: [Bus] = []
-    var animatedBuses: [Bus] = []
+
+    /// Latest authoritative vehicle data from the service.
+    /// All business logic — ETA prediction, active counts, route filtering,
+    /// Live Activity payloads — reads this, never a mid-animation value.
+    private(set) var latestBuses: [Bus] = []
+
+    /// Presentation state for the map annotations. Values are the animation
+    /// *targets* (assigned inside `withAnimation`, so SwiftUI renders the
+    /// in-between positions), plus a continuous unwrapped heading per bus.
+    /// Only map annotation views should read this.
+    private(set) var displayedBuses: [DisplayedBus] = []
+
+    /// Convenience alias for business-logic consumers.
+    var vehicles: [Bus] { latestBuses }
+
     var isLoading = false
     var error: String?
 
@@ -47,12 +61,24 @@ final class BusViewModel {
 
     private let service: any TransitService
     private var pollingTask: Task<Void, Never>?
-    private var animationTask: Task<Void, Never>?
-    private var targetBuses: [Bus] = []
+    /// Bumped on every lifecycle transition (suspend/resume/stop). In-flight
+    /// fetches compare against it before writing state, so a task that was
+    /// cancelled or superseded can never write stale data back.
+    private var pollingGeneration = 0
+    /// Whether the UI currently wants tracking (map on screen). Combined with
+    /// scene phase to decide if the polling task should actually run.
+    private var isTrackingRequested = false
     private var speedTrackers: [String: BusSpeedTracker] = [:]
-    private var isTracking = false
-    private let pollingInterval: UInt64 = 3_000_000_000 // 3 seconds in nanoseconds
-    private let animationDuration: Double = 0.8
+    private let pollingInterval: TimeInterval = 3
+    /// Bus glide duration: slightly shorter than the polling period so a bus
+    /// normally settles before the next update retargets it. If an update
+    /// arrives mid-glide, the native animation redirects from the currently
+    /// presented position (verified on device in the Phase 1 probe).
+    private var busMoveDuration: TimeInterval { pollingInterval * 0.9 }
+    /// A target-to-target jump beyond this is a data discontinuity (GPS jump,
+    /// stale gap after backgrounding) — applied without animation rather than
+    /// masked by a long glide.
+    private let maxAnimatedJumpMeters: Double = 300
     private let averageCampusSpeed = 5.5 // meters per second
     private let maxReliableCampusSpeed = 15.0 // meters per second; faster samples are treated as GPS jitter
     // Widened from 150 m: real OSU stop spacing (400–600 m) means buses are
@@ -86,25 +112,41 @@ final class BusViewModel {
         self.service = service
     }
 
+    deinit {
+        pollingTask?.cancel()
+    }
+
     // MARK: - Public Methods
 
-    /// Start tracking buses with automatic polling
+    /// Start tracking buses with automatic polling (map appeared).
     func startTracking() {
-        guard !isTracking else { return }
-        isTracking = true
+        guard !isTrackingRequested else { return }
+        isTrackingRequested = true
         Task {
             await loadRoutes()
         }
-        startPolling()
+        resumePolling()
     }
 
-    /// Stop tracking and cancel all tasks
+    /// Stop tracking and cancel all tasks (map disappeared).
     func stopTracking() {
-        isTracking = false
-        pollingTask?.cancel()
-        pollingTask = nil
-        animationTask?.cancel()
-        animationTask = nil
+        isTrackingRequested = false
+        suspendPolling()
+    }
+
+    /// Central app-lifecycle hook — the only place polling reacts to scene
+    /// phase. On re-activation the first fetch fires immediately and the map
+    /// animates from the currently displayed positions to the fresh data; the
+    /// path travelled while backgrounded is never replayed.
+    func scenePhaseChanged(to phase: ScenePhase) {
+        switch phase {
+        case .active:
+            resumePolling()
+        case .inactive, .background:
+            suspendPolling()
+        @unknown default:
+            break
+        }
     }
 
     /// Select a route and fetch its buses
@@ -113,9 +155,7 @@ final class BusViewModel {
         selectedStop = nil
         selectedVehicle = nil
         currentStopPredictions = []
-        buses = []
-        animatedBuses = []
-        speedTrackers = [:]
+        clearVehicleState()
         Task {
             await fetchBuses()
         }
@@ -145,9 +185,7 @@ final class BusViewModel {
         selectedStop = nil
         selectedVehicle = nil
         currentStopPredictions = []
-        buses = []
-        animatedBuses = []
-        speedTrackers = [:]
+        clearVehicleState()
     }
 
     /// Re-filter `routes` from `allRoutes` using current user preferences.
@@ -165,11 +203,17 @@ final class BusViewModel {
                 selectRoute(first)
             } else {
                 selectedRoute = nil
-                buses = []
-                animatedBuses = []
-                speedTrackers = [:]
+                clearVehicleState()
             }
         }
+    }
+
+    /// Removes all vehicle data and presentation state without animation
+    /// (route switches replace content; buses must not fly between routes).
+    private func clearVehicleState() {
+        latestBuses = []
+        displayedBuses = []
+        speedTrackers = [:]
     }
 
     /// Estimated speed in miles per hour, derived from raw coordinate polling.
@@ -200,29 +244,27 @@ final class BusViewModel {
 
     private func fetchBuses() async {
         guard let routeCode = selectedRoute?.id else { return }
+        let generation = pollingGeneration
 
         do {
             let incomingBuses = try await service.fetchVehicles(routeCode: routeCode)
 
-            if incomingBuses.isEmpty && buses.isEmpty { return }
+            // Discard stale results: polling was suspended/resumed or the
+            // route was switched while this request was in flight.
+            guard generation == pollingGeneration,
+                  !Task.isCancelled,
+                  routeCode == selectedRoute?.id else { return }
+
+            if incomingBuses.isEmpty && latestBuses.isEmpty { return }
 
             let newBuses = spatiallyFilteredVehicles(incomingBuses)
-
             updateSpeedTrackers(with: newBuses)
-            targetBuses = newBuses
-            buses = newBuses
+
             if let selectedVehicle, !newBuses.contains(where: { $0.id == selectedVehicle.id }) {
                 self.selectedVehicle = nil
             }
 
-            if newBuses.isEmpty {
-                animationTask?.cancel()
-                buses = []
-                animatedBuses = []
-                return
-            }
-
-            await animateToBuses(newBuses)
+            applyVehicleUpdate(newBuses)
 
             // Refresh stop predictions on every bus tick so ETAs stay current.
             if selectedStop != nil {
@@ -230,6 +272,7 @@ final class BusViewModel {
             }
 
         } catch {
+            guard generation == pollingGeneration else { return }
             self.error = error.localizedDescription
         }
     }
@@ -239,69 +282,99 @@ final class BusViewModel {
             currentStopPredictions = []
             return
         }
+        let generation = pollingGeneration
         do {
-            currentStopPredictions = try await service.fetchPredictions(stopID: stop.id)
+            let predictions = try await service.fetchPredictions(stopID: stop.id)
+            guard generation == pollingGeneration, stop.id == selectedStop?.id else { return }
+            currentStopPredictions = predictions
         } catch {
+            guard generation == pollingGeneration else { return }
             currentStopPredictions = []
         }
     }
 
-    private func startPolling() {
+    // MARK: - Polling Lifecycle
+
+    /// Starts the single polling task if tracking is wanted and none is
+    /// running. Fetches immediately on (re)activation — no waiting for the
+    /// first cadence tick. Idempotent across repeated `.active` events.
+    private func resumePolling() {
+        guard isTrackingRequested, pollingTask == nil else { return }
+        pollingGeneration += 1
+        let generation = pollingGeneration
+
+        pollingTask = Task { [weak self, interval = pollingInterval] in
+            while !Task.isCancelled {
+                guard let self, self.pollingGeneration == generation else { return }
+                await self.fetchBuses()
+                if Task.isCancelled { return }
+                try? await Task.sleep(for: .seconds(interval))
+            }
+        }
+    }
+
+    /// Cancels polling and invalidates every in-flight fetch. Displayed buses
+    /// deliberately stay where they are — on resume they animate directly to
+    /// the next fresh positions.
+    private func suspendPolling() {
+        pollingGeneration += 1
         pollingTask?.cancel()
-
-        pollingTask = Task { [weak self] in
-            while !Task.isCancelled {
-                await self?.fetchBuses()
-
-                do {
-                    try await Task.sleep(nanoseconds: self?.pollingInterval ?? 3_000_000_000)
-                } catch {
-                    break
-                }
-            }
-        }
+        pollingTask = nil
     }
 
-    private func animateToBuses(_ newBuses: [Bus]) async {
-        animationTask?.cancel()
+    // MARK: - Presentation Update
 
-        let startBuses = animatedBuses.isEmpty ? newBuses : animatedBuses
-        let startTime = Date()
+    /// Publishes a fresh vehicle snapshot to both state layers.
+    ///
+    /// `latestBuses` is always assigned untouched. `displayedBuses` gets the
+    /// same targets wrapped in `withAnimation`, so MapKit animates existing
+    /// annotations from their currently *presented* positions (native
+    /// redirection — verified in the Phase 1 probe). New buses appear in
+    /// place (a new identity has no prior position to fly from); vanished
+    /// buses are removed immediately, matching existing product behavior.
+    private func applyVehicleUpdate(_ newBuses: [Bus]) {
+        latestBuses = newBuses
 
-        animationTask = Task { [weak self] in
-            guard let self = self else { return }
+        // Bound the accumulated continuous headings before animating. Folding
+        // by whole turns is visually identical (same angle mod 360°) and only
+        // happens in the normally-idle window between glides.
+        if displayedBuses.contains(where: { ($0.continuousHeading?.magnitude ?? 0) > 720 }) {
+            displayedBuses = displayedBuses.map { $0.foldingHeadingByWholeTurns() }
+        }
 
-            while !Task.isCancelled {
-                let elapsed = Date().timeIntervalSince(startTime)
-                let progress = min(elapsed / self.animationDuration, 1.0)
-
-                // Ease-out cubic
-                let easedProgress = 1 - pow(1 - progress, 3)
-
-                self.animatedBuses = self.interpolateBuses(
-                    from: startBuses,
-                    to: newBuses,
-                    progress: easedProgress
+        let previous = Dictionary(displayedBuses.map { ($0.id, $0) },
+                                  uniquingKeysWith: { first, _ in first })
+        let updated = newBuses.map { bus in
+            DisplayedBus(
+                bus: bus,
+                continuousHeading: DisplayedBus.unwrappedHeading(
+                    target: bus.heading,
+                    current: previous[bus.id]?.continuousHeading
                 )
-
-                if progress >= 1.0 {
-                    self.buses = newBuses
-                    self.animatedBuses = newBuses
-                    break
-                }
-
-                // ~60 FPS
-                try? await Task.sleep(nanoseconds: 16_666_667)
-            }
+            )
         }
-    }
 
-    private func interpolateBuses(from: [Bus], to: [Bus], progress: Double) -> [Bus] {
-        to.map { targetBus in
-            if let sourceBus = from.first(where: { $0.id == targetBus.id }) {
-                return sourceBus.interpolated(to: targetBus, progress: progress)
+        let hasMovingBuses = updated.contains { previous[$0.id] != nil }
+        let largestJump = updated
+            .compactMap { displayed -> Double? in
+                guard let prev = previous[displayed.id] else { return nil }
+                return CLLocation(latitude: prev.bus.latitude, longitude: prev.bus.longitude)
+                    .distance(from: CLLocation(latitude: displayed.bus.latitude,
+                                               longitude: displayed.bus.longitude))
             }
-            return targetBus
+            .max() ?? 0
+
+        if !hasMovingBuses
+            || largestJump > maxAnimatedJumpMeters
+            || UIAccessibility.isReduceMotionEnabled {
+            // Reduce Motion: positions update directly — no sustained spatial
+            // animation. Large jumps: an honest teleport instead of a glide
+            // that would fabricate a path the bus never travelled.
+            displayedBuses = updated
+        } else {
+            withAnimation(.linear(duration: busMoveDuration)) {
+                displayedBuses = updated
+            }
         }
     }
 
@@ -909,6 +982,59 @@ private struct PredictionCandidate {
     let isMoving: Bool
     let stabilityScore: Int
     let nearestRouteStopDistance: Double
+}
+
+// MARK: - Displayed Bus (Presentation State)
+
+/// Presentation snapshot for one bus annotation on the map.
+///
+/// `bus` holds the latest model values (the animation *targets*);
+/// `continuousHeading` is the unwrapped rotation angle the marker renders.
+/// Business logic must read `BusViewModel.latestBuses`, never this type.
+struct DisplayedBus: Identifiable, Equatable {
+    /// Latest model snapshot for this vehicle.
+    let bus: Bus
+    /// Continuous, unwrapped heading in degrees. `nil` when the data source
+    /// reports no valid heading — the marker then renders without a direction
+    /// arrow instead of fabricating one. The value may leave 0..<360 (e.g.
+    /// 370°) so SwiftUI always rotates along the shortest arc.
+    let continuousHeading: Double?
+
+    var id: String { bus.id }
+    var coordinate: CLLocationCoordinate2D { bus.coordinate }
+
+    /// Unwraps `target` onto the current continuous angle: picks the
+    /// equivalent angle nearest the presented one, so 350°→10° advances +20°
+    /// (never −340°) and 10°→350° goes back −20°.
+    ///
+    /// - When `target` is `nil` (heading missing this tick) the last valid
+    ///   continuous heading is held, keeping the marker stable.
+    /// - When `current` is `nil` (new bus, or one that reappeared and was
+    ///   treated as a new instance) the normalized target is used directly —
+    ///   no stale angle base is carried over.
+    static func unwrappedHeading(target: Double?, current: Double?) -> Double? {
+        guard let target else { return current }
+        guard let current else { return normalizedAngle(target) }
+        var delta = (normalizedAngle(target) - current).truncatingRemainder(dividingBy: 360)
+        if delta > 180 { delta -= 360 }
+        if delta < -180 { delta += 360 }
+        return current + delta
+    }
+
+    /// Folds the continuous heading back toward zero by whole turns.
+    /// A whole-turn shift renders identically (same angle mod 360°), so this
+    /// is safe as a non-animated write; it keeps the accumulated value bounded
+    /// over long sessions.
+    func foldingHeadingByWholeTurns() -> DisplayedBus {
+        guard let heading = continuousHeading, heading.magnitude > 720 else { return self }
+        let folded = heading - (heading / 360).rounded(.towardZero) * 360
+        return DisplayedBus(bus: bus, continuousHeading: folded)
+    }
+
+    private static func normalizedAngle(_ angle: Double) -> Double {
+        let remainder = angle.truncatingRemainder(dividingBy: 360)
+        return remainder >= 0 ? remainder : remainder + 360
+    }
 }
 
 // MARK: - Arrival Prediction

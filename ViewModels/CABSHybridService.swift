@@ -254,15 +254,17 @@ final class CABSHybridService: TransitService {
         )
     }
 
+    /// Returns `nil` when the path is degenerate (no segment to derive a
+    /// bearing from) — callers must not fabricate a direction in that case.
     private func interpolatedHeading(
         progress: Double,
         path: [CLLocationCoordinate2D]
-    ) -> Double {
-        guard path.count > 1 else { return 0 }
+    ) -> Double? {
+        guard path.count > 1 else { return nil }
         let scaled = max(0, min(1, progress)) * Double(path.count - 1)
         let lower  = Int(scaled)
         let upper  = min(lower + 1, path.count - 1)
-        guard lower != upper else { return 0 }
+        guard lower != upper else { return nil }
         let dLat = path[upper].latitude  - path[lower].latitude
         let dLon = path[upper].longitude - path[lower].longitude
         return ((atan2(dLon, dLat) * 180.0 / .pi) + 360).truncatingRemainder(dividingBy: 360)
