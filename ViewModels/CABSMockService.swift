@@ -177,13 +177,27 @@ final class CABSMockService: TransitService {
         )
     }
 
-    private func heading(for state: BusState, waypoints: [CLLocationCoordinate2D]) -> Double {
-        let from = waypoints[state.waypointIndex]
-        let to   = waypoints[state.nextWaypointIndex]
-        let dLat = to.latitude  - from.latitude
-        let dLon = to.longitude - from.longitude
-        let deg  = atan2(dLon, dLat) * 180.0 / .pi
-        return (deg + 360).truncatingRemainder(dividingBy: 360)
+    /// Forward heading along the segment the bus currently occupies, from the
+    /// current waypoint toward the next — the same pair `coordinate(for:)`
+    /// interpolates between, so heading and position always agree.
+    ///
+    /// Direction is always forward: `progress` only advances, so even while a
+    /// bus dwells near a stop (`fraction` ≈ 0) it points at the segment it is
+    /// about to leave along, never wobbling. On a loop, `nextWaypointIndex`
+    /// wraps to 0, giving the correct closing-segment direction.
+    ///
+    /// Limitation: these waypoints are the sparse stop coordinates, not a road
+    /// polyline, so heading is a straight stop→stop bearing and turns snap at
+    /// each stop. `RouteDefinition` keeps a `patterns` slot for a real encoded
+    /// polyline; supplying one here would make turns gradual without touching
+    /// this method's contract. (The default `CABSHybridService` already uses a
+    /// dense decoded polyline.)
+    private func heading(for state: BusState, waypoints: [CLLocationCoordinate2D]) -> Double? {
+        guard waypoints.count > 1 else { return nil }
+        return RouteGeometry.forwardBearing(
+            from: waypoints[state.waypointIndex],
+            to: waypoints[state.nextWaypointIndex]
+        )
     }
 
     // MARK: - TransitService

@@ -254,20 +254,43 @@ final class CABSHybridService: TransitService {
         )
     }
 
-    /// Returns `nil` when the path is degenerate (no segment to derive a
-    /// bearing from) — callers must not fabricate a direction in that case.
+    /// Forward tangent of the route at `progress`, taken from the *same*
+    /// decoded-polyline segment that `interpolatedCoordinate` places the bus
+    /// on — so the arrow tracks the direction of travel, and turns rotate
+    /// gradually because the polyline is dense.
+    ///
+    /// Direction: buses advance `normalizedProgress` forward each tick (see
+    /// `tick()`), so the tangent runs from the lower index toward the upper —
+    /// the forward heading. Zero-length segments (duplicate polyline points)
+    /// are skipped by searching outward for the nearest distinct pair; at the
+    /// path tail the last distinct segment behind the bus is reused so the
+    /// heading stays forward instead of snapping. Returns `nil` only when the
+    /// whole path is degenerate.
     private func interpolatedHeading(
         progress: Double,
         path: [CLLocationCoordinate2D]
     ) -> Double? {
         guard path.count > 1 else { return nil }
         let scaled = max(0, min(1, progress)) * Double(path.count - 1)
-        let lower  = Int(scaled)
-        let upper  = min(lower + 1, path.count - 1)
-        guard lower != upper else { return nil }
-        let dLat = path[upper].latitude  - path[lower].latitude
-        let dLon = path[upper].longitude - path[lower].longitude
-        return ((atan2(dLon, dLat) * 180.0 / .pi) + 360).truncatingRemainder(dividingBy: 360)
+        let lower  = min(Int(scaled), path.count - 1)
+
+        // Forward: nearest distinct point ahead of `lower`.
+        var upper = lower + 1
+        while upper < path.count, RouteGeometry.coincident(path[lower], path[upper]) {
+            upper += 1
+        }
+        if upper < path.count {
+            return RouteGeometry.forwardBearing(from: path[lower], to: path[upper])
+        }
+
+        // At the tail: reuse the last distinct segment behind the bus, keeping
+        // the same forward direction of travel.
+        var back = lower - 1
+        while back >= 0, RouteGeometry.coincident(path[back], path[lower]) {
+            back -= 1
+        }
+        guard back >= 0 else { return nil }
+        return RouteGeometry.forwardBearing(from: path[back], to: path[lower])
     }
 
     private func nearestStop(to coord: CLLocationCoordinate2D, in stops: [Stop]) -> Stop? {
