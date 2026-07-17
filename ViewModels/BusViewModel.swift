@@ -112,9 +112,8 @@ final class BusViewModel {
         self.service = service
     }
 
-    deinit {
-        pollingTask?.cancel()
-    }
+    // No `deinit` cancellation is needed — see `resumePolling()` for why the
+    // polling task neither retains this view model nor outlives it.
 
     // MARK: - Public Methods
 
@@ -298,6 +297,18 @@ final class BusViewModel {
     /// Starts the single polling task if tracking is wanted and none is
     /// running. Fetches immediately on (re)activation — no waiting for the
     /// first cadence tick. Idempotent across repeated `.active` events.
+    ///
+    /// Lifecycle safety:
+    /// - The task captures `[weak self]` and never holds a strong `self` across
+    ///   the `await`s. Each tick hops onto the main actor via `pollTick()`,
+    ///   which returns after doing its work, so the strong reference is released
+    ///   before `Task.sleep` — the view model can deallocate mid-sleep.
+    /// - If `self` is gone when the task wakes, `weak self` is `nil` and the
+    ///   loop returns. Hence no `deinit` cancellation is required: the task
+    ///   cannot keep the view model alive, and it self-terminates once the view
+    ///   model is released.
+    /// - Cancellation (`suspendPolling`) ends the task promptly because the
+    ///   sleep throws `CancellationError`, which we treat as "stop".
     private func resumePolling() {
         guard isTrackingRequested, pollingTask == nil else { return }
         pollingGeneration += 1
@@ -305,12 +316,29 @@ final class BusViewModel {
 
         pollingTask = Task { [weak self, interval = pollingInterval] in
             while !Task.isCancelled {
-                guard let self, self.pollingGeneration == generation else { return }
-                await self.fetchBuses()
-                if Task.isCancelled { return }
-                try? await Task.sleep(for: .seconds(interval))
+                // One actor-isolated hop; strong `self` does not escape it.
+                guard let shouldContinue = await self?.pollTick(generation: generation),
+                      shouldContinue else { return }
+
+                do {
+                    try await Task.sleep(for: .seconds(interval))
+                } catch {
+                    // Cancelled during sleep — end immediately, don't loop.
+                    return
+                }
             }
         }
+    }
+
+    /// Performs one polling iteration on the main actor and reports whether the
+    /// loop should continue. Returns `false` if this task has been superseded
+    /// (generation bumped) or cancelled, so the caller stops without sleeping.
+    /// Kept as a discrete method so the driving task holds `self` only for the
+    /// duration of the call, never across `Task.sleep`.
+    private func pollTick(generation: Int) async -> Bool {
+        guard generation == pollingGeneration, !Task.isCancelled else { return false }
+        await fetchBuses()
+        return generation == pollingGeneration && !Task.isCancelled
     }
 
     /// Cancels polling and invalidates every in-flight fetch. Displayed buses
