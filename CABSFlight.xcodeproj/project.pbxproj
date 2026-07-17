@@ -13,7 +13,6 @@
 		AA9E78132FBD245700ED9E5D /* CABSLiveActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9E78122FBD245600ED9E5D /* CABSLiveActivityManager.swift */; };
 		AA9E78152FBD245700ED9E5D /* CABSBottomSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9E78142FBD245700ED9E5D /* CABSBottomSheetView.swift */; };
 		AA9E78172FBD253700ED9E5D /* CABSFlightAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9E78162FBD253700ED9E5D /* CABSFlightAttributes.swift */; };
-		AA9E78192FBD253700ED9E5D /* CABSMockEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9E78182FBD253700ED9E5D /* CABSMockEngine.swift */; };
 		AA9E78222FBD311000ED9E5D /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA9E78212FBD311000ED9E5D /* WidgetKit.framework */; };
 		AA9E78242FBD311000ED9E5D /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA9E78232FBD311000ED9E5D /* SwiftUI.framework */; };
 		AA9E78342FBD311100ED9E5D /* CABSFlightWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA9E781F2FBD311000ED9E5D /* CABSFlightWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -22,23 +21,18 @@
 		AAFF9EC52F3D336D00E03F68 /* PolylineDecoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EAB2F3D336D00E03F68 /* PolylineDecoder.swift */; };
 		AAFF9EC62F3D336D00E03F68 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EA92F3D336D00E03F68 /* ContentView.swift */; };
 		AAFF9EC72F3D336D00E03F68 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EBE2F3D336D00E03F68 /* OnboardingView.swift */; };
-		AAFF9EC82F3D336D00E03F68 /* GlassCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB52F3D336D00E03F68 /* GlassCard.swift */; };
 		AAFF9EC92F3D336D00E03F68 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB62F3D336D00E03F68 /* Theme.swift */; };
 		AAFF9ECA2F3D336D00E03F68 /* CABSColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EA62F3D336D00E03F68 /* CABSColors.swift */; };
 		AAFF9ECB2F3D336D00E03F68 /* CABSFlightApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EA72F3D336D00E03F68 /* CABSFlightApp.swift */; };
 		AAFF9ECC2F3D336D00E03F68 /* Stop.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB22F3D336D00E03F68 /* Stop.swift */; };
 		AAFF9ECD2F3D336D00E03F68 /* Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB12F3D336D00E03F68 /* Route.swift */; };
 		AAFF9ECE2F3D336D00E03F68 /* LiquidGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EAA2F3D336D00E03F68 /* LiquidGlassView.swift */; };
-		AAFF9ECF2F3D336D00E03F68 /* BusTrackingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB82F3D336D00E03F68 /* BusTrackingViewModel.swift */; };
-		AAFF9ED02F3D336D00E03F68 /* RoutePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EBF2F3D336D00E03F68 /* RoutePickerView.swift */; };
-		AAFF9ED12F3D336D00E03F68 /* MapContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EBD2F3D336D00E03F68 /* MapContainerView.swift */; };
 		AAFF9ED22F3D336D00E03F68 /* ScreenCornerRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EAC2F3D336D00E03F68 /* ScreenCornerRadius.swift */; };
 		AAFF9ED32F3D336D00E03F68 /* Bus.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB02F3D336D00E03F68 /* Bus.swift */; };
 		AAFF9ED42F3D336D00E03F68 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EC02F3D336D00E03F68 /* SettingsView.swift */; };
 		AAFF9ED52F3D336D00E03F68 /* BusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB92F3D336D00E03F68 /* BusViewModel.swift */; };
 		AAFF9ED62F3D336D00E03F68 /* APIResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EAF2F3D336D00E03F68 /* APIResponse.swift */; };
 		AAFF9ED72F3D336D00E03F68 /* UserPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EBB2F3D336D00E03F68 /* UserPreferences.swift */; };
-		AAFF9ED82F3D336D00E03F68 /* ClassicFlightyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EA82F3D336D00E03F68 /* ClassicFlightyView.swift */; };
 		AAFF9ED92F3D336D00E03F68 /* CABSAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EBA2F3D336D00E03F68 /* CABSAPIService.swift */; };
 /* End PBXBuildFile section */
 
@@ -74,7 +68,6 @@
 		AA9E78122FBD245600ED9E5D /* CABSLiveActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSLiveActivityManager.swift; sourceTree = "<group>"; };
 		AA9E78142FBD245700ED9E5D /* CABSBottomSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSBottomSheetView.swift; sourceTree = "<group>"; };
 		AA9E78162FBD253700ED9E5D /* CABSFlightAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSFlightAttributes.swift; sourceTree = "<group>"; };
-		AA9E78182FBD253700ED9E5D /* CABSMockEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSMockEngine.swift; sourceTree = "<group>"; };
 		AA9E781A2FBD2EFF00ED9E5D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		AA9E781F2FBD311000ED9E5D /* CABSFlightWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CABSFlightWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA9E78212FBD311000ED9E5D /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -82,7 +75,6 @@
 		AAFF9EA52F3D336D00E03F68 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AAFF9EA62F3D336D00E03F68 /* CABSColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSColors.swift; sourceTree = "<group>"; };
 		AAFF9EA72F3D336D00E03F68 /* CABSFlightApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSFlightApp.swift; sourceTree = "<group>"; };
-		AAFF9EA82F3D336D00E03F68 /* ClassicFlightyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClassicFlightyView.swift; sourceTree = "<group>"; };
 		AAFF9EA92F3D336D00E03F68 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AAFF9EAA2F3D336D00E03F68 /* LiquidGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassView.swift; sourceTree = "<group>"; };
 		AAFF9EAB2F3D336D00E03F68 /* PolylineDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolylineDecoder.swift; sourceTree = "<group>"; };
@@ -92,15 +84,11 @@
 		AAFF9EB02F3D336D00E03F68 /* Bus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bus.swift; sourceTree = "<group>"; };
 		AAFF9EB12F3D336D00E03F68 /* Route.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Route.swift; sourceTree = "<group>"; };
 		AAFF9EB22F3D336D00E03F68 /* Stop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Stop.swift; sourceTree = "<group>"; };
-		AAFF9EB52F3D336D00E03F68 /* GlassCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassCard.swift; sourceTree = "<group>"; };
 		AAFF9EB62F3D336D00E03F68 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
-		AAFF9EB82F3D336D00E03F68 /* BusTrackingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusTrackingViewModel.swift; sourceTree = "<group>"; };
 		AAFF9EB92F3D336D00E03F68 /* BusViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BusViewModel.swift; sourceTree = "<group>"; };
 		AAFF9EBA2F3D336D00E03F68 /* CABSAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CABSAPIService.swift; sourceTree = "<group>"; };
 		AAFF9EBB2F3D336D00E03F68 /* UserPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserPreferences.swift; sourceTree = "<group>"; };
-		AAFF9EBD2F3D336D00E03F68 /* MapContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapContainerView.swift; sourceTree = "<group>"; };
 		AAFF9EBE2F3D336D00E03F68 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
-		AAFF9EBF2F3D336D00E03F68 /* RoutePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutePickerView.swift; sourceTree = "<group>"; };
 		AAFF9EC02F3D336D00E03F68 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -186,13 +174,11 @@
 				AA9E781A2FBD2EFF00ED9E5D /* Info.plist */,
 				AAFF9EA62F3D336D00E03F68 /* CABSColors.swift */,
 				AAFF9EA72F3D336D00E03F68 /* CABSFlightApp.swift */,
-				AAFF9EA82F3D336D00E03F68 /* ClassicFlightyView.swift */,
 				AAFF9EA92F3D336D00E03F68 /* ContentView.swift */,
 				AAFF9EAA2F3D336D00E03F68 /* LiquidGlassView.swift */,
 				AAFF9EAB2F3D336D00E03F68 /* PolylineDecoder.swift */,
 				AAFF9EAC2F3D336D00E03F68 /* ScreenCornerRadius.swift */,
 				AA9E78162FBD253700ED9E5D /* CABSFlightAttributes.swift */,
-				AA9E78182FBD253700ED9E5D /* CABSMockEngine.swift */,
 			);
 			path = CABSFlight;
 			sourceTree = "<group>";
@@ -218,7 +204,6 @@
 		AAFF9EB72F3D336D00E03F68 /* Theme */ = {
 			isa = PBXGroup;
 			children = (
-				AAFF9EB52F3D336D00E03F68 /* GlassCard.swift */,
 				AAFF9EB62F3D336D00E03F68 /* Theme.swift */,
 			);
 			path = Theme;
@@ -227,7 +212,6 @@
 		AAFF9EBC2F3D336D00E03F68 /* ViewModels */ = {
 			isa = PBXGroup;
 			children = (
-				AAFF9EB82F3D336D00E03F68 /* BusTrackingViewModel.swift */,
 				AAFF9EB92F3D336D00E03F68 /* BusViewModel.swift */,
 				AAFF9EBA2F3D336D00E03F68 /* CABSAPIService.swift */,
 				AAFF9EBB2F3D336D00E03F68 /* UserPreferences.swift */,
@@ -242,9 +226,7 @@
 		AAFF9EC12F3D336D00E03F68 /* Views */ = {
 			isa = PBXGroup;
 			children = (
-				AAFF9EBD2F3D336D00E03F68 /* MapContainerView.swift */,
 				AAFF9EBE2F3D336D00E03F68 /* OnboardingView.swift */,
-				AAFF9EBF2F3D336D00E03F68 /* RoutePickerView.swift */,
 				AAFF9EC02F3D336D00E03F68 /* SettingsView.swift */,
 				AA9E78142FBD245700ED9E5D /* CABSBottomSheetView.swift */,
 			);
@@ -372,8 +354,6 @@
 				AAFF9EC52F3D336D00E03F68 /* PolylineDecoder.swift in Sources */,
 				AAFF9EC62F3D336D00E03F68 /* ContentView.swift in Sources */,
 				AAFF9EC72F3D336D00E03F68 /* OnboardingView.swift in Sources */,
-				AA9E78192FBD253700ED9E5D /* CABSMockEngine.swift in Sources */,
-				AAFF9EC82F3D336D00E03F68 /* GlassCard.swift in Sources */,
 				AAFF9EC92F3D336D00E03F68 /* Theme.swift in Sources */,
 				AA9E78132FBD245700ED9E5D /* CABSLiveActivityManager.swift in Sources */,
 				AAFF9ECA2F3D336D00E03F68 /* CABSColors.swift in Sources */,
@@ -384,9 +364,6 @@
 				AAFF9ECE2F3D336D00E03F68 /* LiquidGlassView.swift in Sources */,
 				AA7227502FCE4D8900544702 /* CABSMockService.swift in Sources */,
 				AA9E78172FBD253700ED9E5D /* CABSFlightAttributes.swift in Sources */,
-				AAFF9ECF2F3D336D00E03F68 /* BusTrackingViewModel.swift in Sources */,
-				AAFF9ED02F3D336D00E03F68 /* RoutePickerView.swift in Sources */,
-				AAFF9ED12F3D336D00E03F68 /* MapContainerView.swift in Sources */,
 				AA9E78152FBD245700ED9E5D /* CABSBottomSheetView.swift in Sources */,
 				AAFF9ED22F3D336D00E03F68 /* ScreenCornerRadius.swift in Sources */,
 				AAFF9ED32F3D336D00E03F68 /* Bus.swift in Sources */,
@@ -395,7 +372,6 @@
 				AAFF9ED62F3D336D00E03F68 /* APIResponse.swift in Sources */,
 				AAFF9ED72F3D336D00E03F68 /* UserPreferences.swift in Sources */,
 				AA72274E2FCE4D8900544702 /* TransitService.swift in Sources */,
-				AAFF9ED82F3D336D00E03F68 /* ClassicFlightyView.swift in Sources */,
 				AAFF9ED92F3D336D00E03F68 /* CABSAPIService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -472,7 +448,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
@@ -530,7 +506,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
@@ -560,7 +536,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -598,7 +574,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -630,7 +606,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -663,7 +639,7 @@
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.6;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

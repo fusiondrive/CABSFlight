@@ -51,15 +51,6 @@ enum Theme {
     static let cornerRadiusMedium: CGFloat = 12
     static let cornerRadiusLarge:  CGFloat = 20
 
-    // MARK: - Legacy Animations
-
-    /// General-purpose damped spring; retained for pre-Liquid-Glass views.
-    static let animationSpring = Animation.spring(response: 0.4, dampingFraction: 0.8)
-    /// Smooth ease-in-out; retained for pre-Liquid-Glass views.
-    static let animationSmooth = Animation.easeInOut(duration: 0.3)
-    /// Source-compatibility alias — new code should use `Theme.Anim.mapTap`.
-    static let animationMapTap = Anim.mapTap
-
     // MARK: - UI Layout Constants
 
     /// Dimension tokens for the Liquid Glass card shell, map annotations,
@@ -146,19 +137,6 @@ enum Theme {
         static let mapTap = Animation.spring(response: 0.2, dampingFraction: 0.6)
         /// Repeating pulse for the LIVE badge indicator dot.
         static let liveBadgePulse = Animation.easeInOut(duration: 1).repeatForever(autoreverses: true)
-    }
-}
-
-// MARK: - Map Item Button Style
-
-/// Standard press feedback for non-MapKit buttons (toolbar items, cards, etc.).
-/// Use `mapItemPressEffect()` instead inside MapKit `Annotation` closures.
-struct CABSMapItemButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.92 : 1.0)
-            .brightness(configuration.isPressed ? -0.15 : 0)
-            .animation(Theme.Anim.mapTap, value: configuration.isPressed)
     }
 }
 

@@ -8,29 +8,22 @@
 import SwiftUI
 import MapKit
 
-/// Main entry point that switches between Classic and Liquid Glass UI based on iOS version
+/// Main entry point hosting the Liquid Glass UI (minimum deployment: iOS 26).
 struct ContentView: View {
     @State private var viewModel = BusViewModel()
     @State private var preferences = UserPreferences()
     @State private var showOnboarding = !UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
 
     var body: some View {
-        Group {
-            if #available(iOS 26, *) {
-                LiquidGlassView()
-                    .environment(viewModel)
-            } else {
-                ClassicFlightyView()
-                    .environment(viewModel)
+        LiquidGlassView()
+            .environment(viewModel)
+            .onAppear {
+                viewModel.userPreferences = preferences
             }
-        }
-        .onAppear {
-            viewModel.userPreferences = preferences
-        }
-        .fullScreenCover(isPresented: $showOnboarding) {
-            OnboardingView(viewModel: viewModel, preferences: preferences)
-                .interactiveDismissDisabled()
-        }
+            .fullScreenCover(isPresented: $showOnboarding) {
+                OnboardingView(viewModel: viewModel, preferences: preferences)
+                    .interactiveDismissDisabled()
+            }
     }
 }
 
