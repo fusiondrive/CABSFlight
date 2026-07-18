@@ -12,44 +12,10 @@ enum Theme {
 
     // MARK: - Colors
 
-    static let background      = Color(hex: "#0A0A0A")
-    static let cardBackground  = Color(hex: "#1A1A1A")
-    static let border          = Color.white.opacity(0.08)
+    /// Onboarding accent tints. Other legacy color/spacing/typography tokens
+    /// were removed once the classic UI they served was deleted (Phase 0).
     static let accent          = Color(hex: "#007AFF")
     static let accentSecondary = Color(hex: "#FFD60A")
-    static let textPrimary     = Color.white
-    static let textSecondary   = Color.white.opacity(0.6)
-    static let textTertiary    = Color.white.opacity(0.35)
-
-    // MARK: - Typography
-
-    static func headerFont(_ size: CGFloat = 28) -> Font {
-        .system(size: size, weight: .bold, design: .default)
-    }
-
-    static func titleFont(_ size: CGFloat = 20) -> Font {
-        .system(size: size, weight: .semibold, design: .default)
-    }
-
-    static func bodyFont(_ size: CGFloat = 16) -> Font {
-        .system(size: size, weight: .medium, design: .default)
-    }
-
-    static func captionFont(_ size: CGFloat = 13) -> Font {
-        .system(size: size, weight: .regular, design: .default)
-    }
-
-    // MARK: - Spacing
-
-    static let paddingSmall:  CGFloat = 8
-    static let paddingMedium: CGFloat = 16
-    static let paddingLarge:  CGFloat = 24
-
-    // MARK: - Corner Radius
-
-    static let cornerRadiusSmall:  CGFloat = 8
-    static let cornerRadiusMedium: CGFloat = 12
-    static let cornerRadiusLarge:  CGFloat = 20
 
     // MARK: - UI Layout Constants
 

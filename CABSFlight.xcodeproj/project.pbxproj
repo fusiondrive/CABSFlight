@@ -27,7 +27,6 @@
 		AAFF9ECC2F3D336D00E03F68 /* Stop.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB22F3D336D00E03F68 /* Stop.swift */; };
 		AAFF9ECD2F3D336D00E03F68 /* Route.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB12F3D336D00E03F68 /* Route.swift */; };
 		AAFF9ECE2F3D336D00E03F68 /* LiquidGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EAA2F3D336D00E03F68 /* LiquidGlassView.swift */; };
-		AAFF9ED22F3D336D00E03F68 /* ScreenCornerRadius.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EAC2F3D336D00E03F68 /* ScreenCornerRadius.swift */; };
 		AAFF9ED32F3D336D00E03F68 /* Bus.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB02F3D336D00E03F68 /* Bus.swift */; };
 		AAFF9ED42F3D336D00E03F68 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EC02F3D336D00E03F68 /* SettingsView.swift */; };
 		AAFF9ED52F3D336D00E03F68 /* BusViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAFF9EB92F3D336D00E03F68 /* BusViewModel.swift */; };
@@ -78,7 +77,6 @@
 		AAFF9EA92F3D336D00E03F68 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AAFF9EAA2F3D336D00E03F68 /* LiquidGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiquidGlassView.swift; sourceTree = "<group>"; };
 		AAFF9EAB2F3D336D00E03F68 /* PolylineDecoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PolylineDecoder.swift; sourceTree = "<group>"; };
-		AAFF9EAC2F3D336D00E03F68 /* ScreenCornerRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenCornerRadius.swift; sourceTree = "<group>"; };
 		AAFF9EAE2F3D336D00E03F68 /* CABSFlight.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = CABSFlight.xcodeproj; sourceTree = "<group>"; };
 		AAFF9EAF2F3D336D00E03F68 /* APIResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIResponse.swift; sourceTree = "<group>"; };
 		AAFF9EB02F3D336D00E03F68 /* Bus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Bus.swift; sourceTree = "<group>"; };
@@ -177,7 +175,6 @@
 				AAFF9EA92F3D336D00E03F68 /* ContentView.swift */,
 				AAFF9EAA2F3D336D00E03F68 /* LiquidGlassView.swift */,
 				AAFF9EAB2F3D336D00E03F68 /* PolylineDecoder.swift */,
-				AAFF9EAC2F3D336D00E03F68 /* ScreenCornerRadius.swift */,
 				AA9E78162FBD253700ED9E5D /* CABSFlightAttributes.swift */,
 			);
 			path = CABSFlight;
@@ -365,7 +362,6 @@
 				AA7227502FCE4D8900544702 /* CABSMockService.swift in Sources */,
 				AA9E78172FBD253700ED9E5D /* CABSFlightAttributes.swift in Sources */,
 				AA9E78152FBD245700ED9E5D /* CABSBottomSheetView.swift in Sources */,
-				AAFF9ED22F3D336D00E03F68 /* ScreenCornerRadius.swift in Sources */,
 				AAFF9ED32F3D336D00E03F68 /* Bus.swift in Sources */,
 				AAFF9ED42F3D336D00E03F68 /* SettingsView.swift in Sources */,
 				AAFF9ED52F3D336D00E03F68 /* BusViewModel.swift in Sources */,
