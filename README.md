@@ -163,3 +163,15 @@ I am a Senior Electrical and Computer Engineering student at The Ohio State Univ
 
 * **Portfolio:** [fusiondrive.github.io](https://fusiondrive.github.io)
 * **GitHub:** [@fusiondrive](https://github.com/fusiondrive)
+
+---
+
+## License
+
+The source code in this repository is available under the [MIT License](LICENSE).
+
+The Ohio State University, CABS, and associated names, marks, route data, and
+branding are the property of their respective owners and are not licensed under
+the MIT License. Images and screenshots in the `assets/` directory are provided
+for project documentation and showcase purposes only and are not licensed for
+reuse.
