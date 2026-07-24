@@ -8,6 +8,28 @@
 import SwiftUI
 import MapKit
 
+// MARK: - Bottom Safe-Area Inset Environment
+
+/// Carries the device's real bottom safe-area inset (the home-indicator /
+/// gesture-bar region) down to the floating card shell.
+///
+/// The bottom overlays deliberately `ignoresSafeArea(edges: .bottom)` so their
+/// glass can sit at the very bottom of the screen, which means a descendant can
+/// no longer read the true inset from its own geometry (it reads 0). We measure
+/// it once at the root — where the safe area is still intact — and inject it, so
+/// the card lifts above the indicator by the correct amount on every device
+/// instead of relying on a hardcoded magic number.
+private struct BottomSafeInsetKey: EnvironmentKey {
+    static let defaultValue: CGFloat = 0
+}
+
+extension EnvironmentValues {
+    var bottomSafeInset: CGFloat {
+        get { self[BottomSafeInsetKey.self] }
+        set { self[BottomSafeInsetKey.self] = newValue }
+    }
+}
+
 /// Root view for the iOS 26+ Liquid Glass experience.
 /// Composes the full-screen map, header overlay, floating route buttons,
 /// bus/route info card, and the stop bottom sheet.
@@ -25,6 +47,10 @@ struct LiquidGlassView: View {
             )
         )
     )
+
+    /// Live bottom safe-area inset, measured at the root (see `BottomSafeInsetKey`)
+    /// and injected so the floating cards clear the home indicator on any device.
+    @State private var bottomSafeInset: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -77,6 +103,19 @@ struct LiquidGlassView: View {
                     .zIndex(30)
             }
         }
+        // Measure the true bottom safe-area inset here, at the root, where the
+        // safe area is still intact (the bottom overlays below ignore it). The
+        // GeometryReader lives in a background so it doesn't affect layout.
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { bottomSafeInset = proxy.safeAreaInsets.bottom }
+                    .onChange(of: proxy.safeAreaInsets.bottom) { _, newInset in
+                        bottomSafeInset = newInset
+                    }
+            }
+        }
+        .environment(\.bottomSafeInset, bottomSafeInset)
         .onAppear {
             viewModel.startTracking()
         }
@@ -405,21 +444,32 @@ struct LiquidBusMarker: View {
 @available(iOS 26, *)
 struct LiquidBottomCardShell<Content: View>: View {
     let tintColor: Color
+
+    /// Live device bottom safe-area inset (home indicator / gesture bar),
+    /// injected from the root. Drives the card's bottom offset so it floats
+    /// *above* the indicator on every device instead of a hardcoded value.
+    @Environment(\.bottomSafeInset) private var bottomSafeInset
+
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         VStack(spacing: 0) {
             content()
         }
-        .padding(.bottom, Theme.UI.sheetBottomInset)
+        .padding(.bottom, Theme.UI.sheetContentBottomPadding)
+        // Container-concentric corners follow the device's screen radius so the
+        // card's curvature stays harmonious with the physical display corners,
+        // rather than an arbitrary fixed radius.
         .glassEffect(
             .regular.tint(tintColor.opacity(Theme.UI.glassShellTintOpacity)),
-            in: RoundedRectangle(cornerRadius: Theme.UI.sheetCornerRadius, style: .continuous)
+            in: .rect(cornerRadius: .containerConcentric)
         )
         .shadow(color: .black.opacity(0.15), radius: 15, y: 8)
-        .ignoresSafeArea(edges: .bottom)
         .padding(.horizontal, Theme.UI.sheetHorizontalPadding)
-        .padding(.bottom, Theme.UI.sheetBottomPadding)
+        // Float clear of the home indicator: real safe-area inset + a small gap.
+        // No `ignoresSafeArea` here — the card sits entirely above the gesture
+        // bar, with the indicator living in the gap below it.
+        .padding(.bottom, bottomSafeInset + Theme.UI.sheetBottomPadding)
     }
 }
 

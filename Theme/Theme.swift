@@ -22,12 +22,17 @@ enum Theme {
     /// Dimension tokens for the Liquid Glass card shell, map annotations,
     /// and interactive elements throughout the app.
     enum UI {
-        /// Corner radius of the full-height glass bottom card shell.
+        /// Fallback corner radius for the glass card shell. The shell now uses
+        /// container-concentric corners that follow the device's screen radius;
+        /// this value is only a reference for non-concentric contexts (previews).
         static let sheetCornerRadius: CGFloat = 38
         /// Corner radius shared by bento prediction cards and the track button.
         static let bentoCardCornerRadius: CGFloat = 16
-        /// Bottom padding inside `LiquidBottomCardShell` to clear the home indicator.
-        static let sheetBottomInset: CGFloat = 44
+        /// Inner bottom breathing space between the card's content and the glass
+        /// edge. Sized to clear the larger concentric bottom-corner curve so a
+        /// full-width control (the track button) isn't clipped. Home-indicator
+        /// clearance is handled separately via the live safe-area inset.
+        static let sheetContentBottomPadding: CGFloat = 28
         /// Horizontal edge padding applied to `LiquidBottomCardShell`.
         static let sheetHorizontalPadding: CGFloat = 8
         /// Outer bottom spacing between the card shell and the physical screen edge.
